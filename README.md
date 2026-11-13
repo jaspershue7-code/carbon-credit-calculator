@@ -8,7 +8,12 @@ Double-click `site/index.html`. No server or install needed.
 
 ## Pages
 
-Work pages (your own entries):
+The front page and the briefing pages (from the registry data):
+
+- **Overview:** a written briefing on Tradewater's portfolio with numbered, annotated charts (credits retired per year, credits remaining by vintage) and a summary of how Tradewater compares with other developers. Numbers and sentences are computed from the data on load.
+- **Insights:** who else sells these credits. For each of the three Berkeley project types Tradewater works in, developers ranked by credits issued, plus Tradewater against everyone else over time. Types are Berkeley's labels, so other refrigerant project types are not counted.
+
+Work pages (your own entries), under the **My work** menu:
 
 - **This week:** a quick-add bar at the top (deal, target, call or event, press Enter), lead cards from the registry data with a peek at each company's history and an add button, and buttons on every row (log a touch, snooze, set a next step, mark a step or call done). When nothing is entered yet it shows only the add bar and the lead cards. Below that: open deals with no next step, an overdue next step or no contact for a while; companies due for a touch; customers and partners that usually retire credits this month or next; events in the next 60 days; recent retirements in the data; touches logged in the last 7 days against a goal you set.
 - **Targets:** companies you want to reach, with people, planned channel (warm intro, LinkedIn comment, LinkedIn message, cold email, conference), touch log and next touch date. Suggestions come from the registry data.

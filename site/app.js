@@ -490,7 +490,7 @@
 
   function route(keepScroll) {
     const parts = (location.hash || '#/').replace(/^#\/?/, '').split('/');
-    const page = parts[0] || 'week';
+    const page = parts[0] || 'overview';
     let arg = parts.slice(1).join('/');
     try { arg = decodeURIComponent(arg); } catch (e) { /* keep the raw text */ }
     let node, section;
@@ -503,27 +503,38 @@
       else if (page === 'partners') { node = partnersView(); section = 'partners'; }
       else if (page === 'lead') { node = leadView(arg); section = 'leads'; }
       else if (page === 'leads') { node = leadsView(); section = 'leads'; }
-      else { node = window.TWPages.week(); section = 'week'; }
+      else { node = window.TWPages.overview(); section = 'overview'; }
     } catch (err) {
       console.error(err);
-      node = el('div', {}, el('h1', {}, 'Something went wrong'), el('p', { class: 'empty' }, 'This page could not be drawn. Go back to This week and try again.'));
-      section = 'week';
+      node = el('div', {}, el('h1', {}, 'Something went wrong'), el('p', { class: 'empty' }, 'This page could not be drawn. Go back to the overview and try again.'));
+      section = 'overview';
     }
     const isMarket = MARKET_LINKS.some(l => l[0] === section);
     if (isMarket) { const wrap = el('div'); wrap.append(marketNav(section), node); node = wrap; }
     sourceEl.textContent = isMarket ? sourceText(section) : '';
     footEl.textContent = isMarket ? MARKET_FOOT : TOOL_FOOT;
-    const mainSection = isMarket ? 'market' : section;
-    document.querySelectorAll('header nav a').forEach(a =>
+    // Top navigation: Overview, Market data, Insights, or the "My work" menu for everything else.
+    const mainSection = isMarket ? 'market' : (section === 'overview' || section === 'insights') ? section : 'work';
+    document.querySelectorAll('header [data-s]').forEach(a =>
       a.getAttribute('data-s') === mainSection ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
-    // The Calendar link shows how many reminders are due now.
-    const calLink = document.querySelector('header nav a[data-s="calendar"]');
-    if (calLink) { const n = window.TWAgenda ? window.TWAgenda.reminders().length : 0; calLink.textContent = n ? 'Calendar (' + n + ')' : 'Calendar'; }
+    document.querySelectorAll('header [data-w]').forEach(a =>
+      a.getAttribute('data-w') === section ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
+    const menu = document.querySelector('header .menu');
+    if (menu) menu.removeAttribute('open');
+    // Reminders due now show on the Calendar link and on the menu itself.
+    const n = window.TWAgenda ? window.TWAgenda.reminders().length : 0;
+    const calLink = document.querySelector('header [data-w="calendar"]');
+    if (calLink) calLink.textContent = n ? 'Calendar (' + n + ')' : 'Calendar';
+    const menuTitle = document.querySelector('header .menu summary');
+    if (menuTitle) menuTitle.textContent = n ? 'My work (' + n + ')' : 'My work';
     const y = window.scrollY;
     view.replaceChildren(node);
     window.scrollTo(0, keepScroll === true ? y : 0);
   }
   window.TWKit.refresh = () => route(true);
   window.addEventListener('hashchange', () => route());
+  // Close the My work menu when clicking elsewhere or pressing Escape.
+  document.addEventListener('click', e => { const m = document.querySelector('header .menu'); if (m && m.open && !m.contains(e.target)) m.removeAttribute('open'); });
+  document.addEventListener('keydown', e => { const m = document.querySelector('header .menu'); if (e.key === 'Escape' && m && m.open) { m.removeAttribute('open'); m.querySelector('summary').focus(); } });
   route();
 })();

@@ -6,7 +6,7 @@
   <title>Tradewater sales tool</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:wght@500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -14,15 +14,23 @@
     <div class="wrap">
       <a class="brand" href="#/">Tradewater sales tool</a>
       <nav aria-label="Sections">
-        <a href="#/" data-s="week">This week</a>
-        <a href="#/targets" data-s="targets">Targets</a>
-        <a href="#/accounts" data-s="accounts">Accounts</a>
-        <a href="#/deals" data-s="deals">Deals</a>
-        <a href="#/content" data-s="content">Content</a>
-        <a href="#/events" data-s="events">Events</a>
-        <a href="#/calendar" data-s="calendar">Calendar</a>
+        <a href="#/" data-s="overview">Overview</a>
         <a href="#/buyers" data-s="market">Market data</a>
-        <a href="#/settings" data-s="settings">Settings</a>
+        <a href="#/insights" data-s="insights">Insights</a>
+        <details class="menu" data-s="work">
+          <summary>My work</summary>
+          <div class="menu-panel">
+            <a href="#/week" data-w="week">This week</a>
+            <a href="#/targets" data-w="targets">Targets</a>
+            <a href="#/accounts" data-w="accounts">Accounts</a>
+            <a href="#/deals" data-w="deals">Deals</a>
+            <a href="#/calendar" data-w="calendar">Calendar</a>
+            <a href="#/events" data-w="events">Events</a>
+            <a href="#/content" data-w="content">Content</a>
+            <hr>
+            <a href="#/settings" data-w="settings">Settings</a>
+          </div>
+        </details>
       </nav>
     </div>
     <div class="wrap"><span class="src" id="source"></span></div>
@@ -30,6 +38,7 @@
   <main class="wrap" id="view" aria-live="polite"></main>
   <footer class="wrap foot" id="foot"></footer>
   <script src="kit.js"></script>
+  <script src="charts.js"></script>
   <script src="data.js"></script>
   <script src="portfolio.js"></script>
   <script src="store.js"></script>
@@ -41,6 +50,7 @@
   <script src="calendar.js"></script>
   <script src="page-settings.js"></script>
   <script src="page-week.js"></script>
+  <script src="page-overview.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

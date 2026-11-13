@@ -135,8 +135,48 @@ const group = (list, f) => {
   return Object.values(g).sort((a, z) => z.issued - a.issued);
 };
 
+// ---- Who else sells these credits: every project of the same Berkeley types, grouped by developer ----
+const twTypeNames = new Set(projects.map(p => p.type));
+const SUFFIX = /\b(inc|llc|ltd|limited|corp|corporation|co|pbc|the|company|lp|l p)\b/g;
+const devKey = n => (n || '').toLowerCase().replace(/\(pp\)/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(SUFFIX, ' ').replace(/\s+/g, ' ').trim();
+const twRows = new Set(tw);
+const sameType = data.filter(r => twTypeNames.has(r.G));
+const blank = () => ({ projects: 0, issued: 0, retired: 0, remaining: 0 });
+const addTo = (o, r) => { o.projects += 1; o.issued += num(r.P); o.retired += num(r.Q); o.remaining += num(r.R); };
+const rnd = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Math.round(v)]));
+const market = { types: [], all: blank(), tradewater: blank(), issuedByVintage: { tradewater: {}, others: {} }, retiredByYear: { tradewater: {}, others: {} } };
+for (const type of twTypeNames) {
+  const rows = sameType.filter(r => r.G === type);
+  const t = { name: type, all: blank(), tradewater: blank(), developers: new Map() };
+  for (const r of rows) {
+    const isTw = twRows.has(r);
+    addTo(t.all, r); addTo(market.all, r);
+    if (isTw) { addTo(t.tradewater, r); addTo(market.tradewater, r); }
+    const key = isTw ? 'tradewater' : devKey(r.O) || 'unknown';
+    const dev = t.developers.get(key) || { names: {}, isTradewater: isTw, ...blank() };
+    dev.names[isTw ? 'Tradewater' : (r.O || 'Unknown developer').trim()] = (dev.names[isTw ? 'Tradewater' : (r.O || 'Unknown developer').trim()] || 0) + num(r.P);
+    addTo(dev, r); t.developers.set(key, dev);
+    const side = isTw ? 'tradewater' : 'others';
+    for (const [y, c] of Object.entries(VINTAGE)) if (num(r[c])) market.issuedByVintage[side][y] = (market.issuedByVintage[side][y] || 0) + num(r[c]);
+    for (const [y, c] of Object.entries(RETIRED)) if (num(r[c])) market.retiredByYear[side][y] = (market.retiredByYear[side][y] || 0) + num(r[c]);
+  }
+  const devs = [...t.developers.values()].map(d => ({
+    name: d.isTradewater ? 'Tradewater' : Object.entries(d.names).sort((a, z) => z[1] - a[1])[0][0],
+    isTradewater: d.isTradewater, projects: d.projects, issued: Math.round(d.issued), retired: Math.round(d.retired), remaining: Math.round(d.remaining),
+  })).sort((a, z) => z.issued - a.issued);
+  const twRank = devs.findIndex(d => d.isTradewater) + 1;
+  const top = devs.slice(0, 8);
+  if (twRank > 8) top.push(devs[twRank - 1]);   // always show Tradewater, even when it ranks lower
+  market.types.push({ name: type, all: rnd(t.all), tradewater: rnd(t.tradewater), developerCount: devs.length, twRank, developers: top });
+}
+market.all = rnd(market.all); market.tradewater = rnd(market.tradewater);
+for (const side of ['tradewater', 'others']) for (const k of ['issuedByVintage', 'retiredByYear']) for (const y of Object.keys(market[k][side])) market[k][side][y] = Math.round(market[k][side][y]);
+market.types.sort((a, z) => z.all.issued - a.all.issued);
+
 const out = {
   version: 'v2026-08',
+  market,
+  byRegistry: group(projects, p => p.registry),
   throughDate: '2026-08-31',
   totals: {
     projects: projects.length,
