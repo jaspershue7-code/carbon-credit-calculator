@@ -1,22 +1,7 @@
 (function () {
   const D = window.TW_DATA;
   const view = document.getElementById('view');
-  const fmt = n => Math.round(n).toLocaleString('en-US');
-  const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0) + '%';
-  // Compact numbers for chart labels so neighbouring bars do not collide.
-  const short = n => n >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'K' : fmt(n);
-
-  // Small element helper. Text always goes in as text, never as HTML.
-  function el(tag, attrs, ...kids) {
-    const e = document.createElement(tag);
-    for (const [k, v] of Object.entries(attrs || {})) {
-      if (k === 'class') e.className = v;
-      else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
-      else e.setAttribute(k, v);
-    }
-    for (const kid of kids.flat()) if (kid != null) e.append(kid.nodeType ? kid : document.createTextNode(kid));
-    return e;
-  }
+  const { fmt, pct, short, el } = window.TWKit;   // shared helpers, see kit.js
 
   const KIND_LABEL = {
     intermediary: 'Likely marketplace or trader',
@@ -38,15 +23,17 @@
   const sourceText = section => section === 'portfolio' && window.TW_PORTFOLIO
     ? 'Berkeley Carbon Trading Project, ' + window.TW_PORTFOLIO.version + ', through ' + window.TW_PORTFOLIO.throughDate
     : D.source + ', snapshot of ' + D.generatedAt.slice(0, 10);
-  document.getElementById('foot').textContent =
+  const footEl = document.getElementById('foot');
+  const MARKET_FOOT =
     'Data: CarbonPlan OffsetsDB (buyer, partner and competitor pages) and the Berkeley Carbon Trading Project Voluntary Registry Offsets Database (portfolio page), ' +
     'both from public registry records. Provided as is. Registries may have their own terms on this data. A "retirement" is a credit used by a buyer, not a sale by Tradewater.';
+  const TOOL_FOOT = 'Your entries are saved in this browser only. Export a backup from Settings. Registry data is from CarbonPlan OffsetsDB and the Berkeley Carbon Trading Project.';
 
   /* ---------- list view ---------- */
   const state = { q: '', show: 'buyers', sort: 'total' };
 
   function listView() {
-    document.title = 'Tradewater buyer finder';
+    document.title = 'Tradewater sales tool';
     const buyers = D.buyers;
     const people = buyers.filter(b => b.kind === 'buyer' || b.kind === 'account');
 
@@ -168,18 +155,22 @@
 
   function profileView(id) {
     const b = D.buyers.find(x => x.id === id);
-    if (!b) return el('div', {}, el('a', { class: 'back', href: '#/' }, 'Back to all buyers'), el('p', { class: 'empty' }, 'Buyer not found.'));
-    document.title = b.name + ' | Tradewater buyer finder';
+    if (!b) return el('div', {}, el('a', { class: 'back', href: '#/buyers' }, 'Back to all buyers'), el('p', { class: 'empty' }, 'Buyer not found.'));
+    document.title = b.name + ' | Tradewater sales tool';
     const projById = Object.fromEntries(D.projects.map(p => [p.id, p]));
 
     const root = el('div');
     root.append(
-      el('a', { class: 'back', href: '#/' }, '← All buyers'),
+      el('a', { class: 'back', href: '#/buyers' }, '← All buyers'),
       el('h1', {}, b.name),
       el('p', { class: 'lede' },
         `${fmt(b.total)} credits retired across ${b.count} retirement${b.count === 1 ? '' : 's'}` +
         (b.first ? `, from ${b.first} to ${b.last}.` : '.')));
     if (KIND_HELP[b.kind]) root.append(el('p', { class: 'note' }, KIND_HELP[b.kind]));
+    if (window.TWHooks && b.kind !== 'tradewater' && b.kind !== 'none') {
+      root.append(window.TWHooks.companyButtons(b.name, { type: 'buyer', id: b.id },
+        b.kind === 'intermediary' ? [['partner', 'Add as partner']] : [['customer', 'Add as customer'], ['prospect', 'Add as target']]));
+    }
 
     root.append(el('ul', { class: 'facts' },
       el('li', {}, el('b', {}, fmt(b.total)), el('span', {}, 'credits retired')),
@@ -222,7 +213,7 @@
   }
 
   function partnersView() {
-    document.title = 'Partners | Tradewater buyer finder';
+    document.title = 'Partners | Tradewater sales tool';
     const partners = D.buyers.filter(b => b.kind === 'intermediary');
     const total = partners.reduce((s, b) => s + b.total, 0);
     const yearSet = new Set();
@@ -270,7 +261,7 @@
   const lstate = { q: '', show: 'buyers', type: 'all', sort: 'total' };
 
   function leadsView() {
-    document.title = 'Competitor buyers | Tradewater buyer finder';
+    document.title = 'Competitor buyers | Tradewater sales tool';
     const lc = D.leadCoverage;
     const root = el('div');
     root.append(
@@ -339,7 +330,7 @@
   function leadView(id) {
     const l = D.leads.find(x => x.id === id);
     if (!l) return el('div', {}, el('a', { class: 'back', href: '#/leads' }, 'Back to competitor buyers'), el('p', { class: 'empty' }, 'Company not found.'));
-    document.title = l.name + ' | Tradewater buyer finder';
+    document.title = l.name + ' | Tradewater sales tool';
     const root = el('div');
     root.append(
       el('a', { class: 'back', href: '#/leads' }, '← Competitor buyers'),
@@ -348,6 +339,7 @@
         `${fmt(l.total)} credits retired across ${l.count} retirement${l.count === 1 ? '' : 's'} from other proponents' projects` +
         (l.first ? `, from ${l.first} to ${l.last}.` : '.')));
     if (KIND_HELP[l.kind]) root.append(el('p', { class: 'note' }, KIND_HELP[l.kind]));
+    if (window.TWHooks) root.append(window.TWHooks.companyButtons(l.name, { type: 'lead', id: l.id }, [['prospect', 'Add as target']]));
     root.append(el('ul', { class: 'facts' },
       el('li', {}, el('b', {}, fmt(l.total)), el('span', {}, 'credits retired')),
       el('li', {}, el('b', {}, l.yearsActive), el('span', {}, l.yearsActive === 1 ? 'year active' : 'years active')),
@@ -375,7 +367,7 @@
   const pstate = { q: '', status: 'all', type: 'all', remaining: 'all', sort: 'remaining' };
 
   function portfolioView() {
-    document.title = 'Portfolio | Tradewater buyer finder';
+    document.title = 'Portfolio | Tradewater sales tool';
     const P = window.TW_PORTFOLIO;
     if (!P) return el('div', {}, el('h1', {}, 'Portfolio'), el('p', { class: 'empty' }, 'Portfolio data is missing. Run scripts/build-portfolio.mjs.'));
     const t = P.totals;
@@ -492,21 +484,46 @@
   }
 
   /* ---------- router ---------- */
-  function route() {
-    const h = location.hash;
-    let m, node, section = 'buyers';
-    if (h === '#/portfolio') { node = portfolioView(); section = 'portfolio'; }
-    else if ((m = h.match(/^#\/buyer\/(.+)$/))) node = profileView(decodeURIComponent(m[1]));
-    else if (h === '#/partners') { node = partnersView(); section = 'partners'; }
-    else if ((m = h.match(/^#\/lead\/(.+)$/))) { node = leadView(decodeURIComponent(m[1])); section = 'leads'; }
-    else if (h === '#/leads') { node = leadsView(); section = 'leads'; }
-    else node = listView();
-    sourceEl.textContent = sourceText(section);
-    document.querySelectorAll('nav a').forEach(a =>
-      a.getAttribute('data-s') === section ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
+  const MARKET_LINKS = [['buyers', 'Buyers', '#/buyers'], ['partners', 'Partners', '#/partners'], ['leads', 'Competitor buyers', '#/leads'], ['portfolio', 'Portfolio', '#/portfolio']];
+  const marketNav = section => el('nav', { class: 'subnav', 'aria-label': 'Market data' },
+    MARKET_LINKS.map(([k, label, href]) => el('a', { href, 'aria-current': k === section ? 'page' : null }, label)));
+
+  function route(keepScroll) {
+    const parts = (location.hash || '#/').replace(/^#\/?/, '').split('/');
+    const page = parts[0] || 'week';
+    let arg = parts.slice(1).join('/');
+    try { arg = decodeURIComponent(arg); } catch (e) { /* keep the raw text */ }
+    let node, section;
+    try {
+      const fn = window.TWPages && window.TWPages[page];
+      if (fn) { node = fn(arg); section = typeof fn.section === 'function' ? fn.section(arg) : fn.section; }
+      else if (page === 'portfolio') { node = portfolioView(); section = 'portfolio'; }
+      else if (page === 'buyer') { node = profileView(arg); section = 'buyers'; }
+      else if (page === 'buyers') { node = listView(); section = 'buyers'; }
+      else if (page === 'partners') { node = partnersView(); section = 'partners'; }
+      else if (page === 'lead') { node = leadView(arg); section = 'leads'; }
+      else if (page === 'leads') { node = leadsView(); section = 'leads'; }
+      else { node = window.TWPages.week(); section = 'week'; }
+    } catch (err) {
+      console.error(err);
+      node = el('div', {}, el('h1', {}, 'Something went wrong'), el('p', { class: 'empty' }, 'This page could not be drawn. Go back to This week and try again.'));
+      section = 'week';
+    }
+    const isMarket = MARKET_LINKS.some(l => l[0] === section);
+    if (isMarket) { const wrap = el('div'); wrap.append(marketNav(section), node); node = wrap; }
+    sourceEl.textContent = isMarket ? sourceText(section) : '';
+    footEl.textContent = isMarket ? MARKET_FOOT : TOOL_FOOT;
+    const mainSection = isMarket ? 'market' : section;
+    document.querySelectorAll('header nav a').forEach(a =>
+      a.getAttribute('data-s') === mainSection ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
+    // The Calendar link shows how many reminders are due now.
+    const calLink = document.querySelector('header nav a[data-s="calendar"]');
+    if (calLink) { const n = window.TWAgenda ? window.TWAgenda.reminders().length : 0; calLink.textContent = n ? 'Calendar (' + n + ')' : 'Calendar'; }
+    const y = window.scrollY;
     view.replaceChildren(node);
-    window.scrollTo(0, 0);
+    window.scrollTo(0, keepScroll === true ? y : 0);
   }
-  window.addEventListener('hashchange', route);
+  window.TWKit.refresh = () => route(true);
+  window.addEventListener('hashchange', () => route());
   route();
 })();

@@ -1,40 +1,54 @@
-# Tradewater buyer finder
+# Tradewater sales tool
 
-A static website that shows which companies have retired credits from Tradewater projects, built from CarbonPlan's OffsetsDB.
+A static website that supports a Tradewater carbon credit seller's weekly work: outreach, nurturing, account management, open deals, content and events. It combines the seller's own entries with public registry data (CarbonPlan OffsetsDB and the Berkeley Voluntary Registry Offsets Database).
 
 ## Open the site
 
 Double-click `site/index.html`. No server or install needed.
 
-## Rebuild the data
-
-1. Download and unzip `offsets-db.csv.zip` from CarbonPlan into its own empty folder.
-2. Run: `node scripts/build-data.mjs <that folder>`
-3. This rewrites `site/data.js`.
-
 ## Pages
 
-- **Buyers:** who retired credits from Tradewater projects, with a profile per company.
-- **Partners:** the buyers flagged as marketplaces, traders or programs, with volume by year and typical days between retirements.
-- **Competitor buyers:** companies that retired the same credit types (ozone depleting substances, HFC reclamation, oil and gas wells) from other proponents' projects but have no retirement from a Tradewater project in this data.
+Work pages (your own entries):
 
-- **Portfolio:** Tradewater's 112 projects with credits issued, retired and remaining by project, vintage and year, from the Berkeley database (v2026-08, through 2026-08-31).
+- **This week:** open deals with no next step, an overdue next step or no contact for a while; companies due for a touch; customers and partners that usually retire credits this month or next; events in the next 60 days; recent retirements in the data; touches logged in the last 7 days against a goal you set.
+- **Targets:** companies you want to reach, with people, planned channel (warm intro, LinkedIn comment, LinkedIn message, cold email, conference), touch log and next touch date. Suggestions come from the registry data.
+- **Accounts:** customers and partners, linked to their registry record to show their usual buying month.
+- **Deals:** stages from initial meeting to closed, a next step and due date on each deal, and a dated log.
+- **Content:** LinkedIn post drafts built from the data, a monthly newsletter draft, email and message templates (cold email, warm intro, follow-up, nudge, event, proposal outline) that fill in known details, and a library of due diligence answers you write.
+- **Events:** who is going, outreach status for each, sessions to attend, and a checklist for before and after.
+- **Calendar:** a month view, an agenda and a "Reminders now" list. It collects calls and meetings (with a time), events, deal next steps and next touch dates. Each item has a "Remind me" setting (on the day, 1 day, 3 days or 1 week before, default 1 day). The nav link shows how many reminders are due, and This week lists them at the top. Reminders show only when the tool is open. There is no email, phone or pop-up alert.
+- **Settings:** backup, restore, CSV import and review thresholds.
 
-To rebuild the portfolio page: `node scripts/build-portfolio.mjs <path to the Berkeley xlsx>`. This rewrites `site/portfolio.js`. The Berkeley file is not stored in this repo.
+Market data pages (from the registries): Buyers, Partners, Competitor buyers and Portfolio. Each profile has buttons to add the company to your targets or accounts.
+
+## Where your entries are stored
+
+In the browser only (localStorage). They are not sent anywhere and are not in this repository. Export a backup from Settings regularly. Clearing browser data erases them, and a different browser or computer starts empty. Open the site from the same place each time, because the browser ties entries to the address.
+
+Nothing is pre-filled. Import deals or companies from a spreadsheet with Settings, using CSV columns listed there.
+
+## Rebuild the registry data
+
+1. Download and unzip `offsets-db.csv.zip` from CarbonPlan into its own empty folder.
+2. Run: `node scripts/build-data.mjs <that folder>`. This rewrites `site/data.js`.
+3. For the Portfolio page: `node scripts/build-portfolio.mjs <Berkeley xlsx> <CarbonPlan folder>`. This rewrites `site/portfolio.js`. The CarbonPlan folder is optional and adds the cross-check notes.
 
 ## How buyers are decided
 
-- Tradewater projects are those with "Tradewater" in the project name or proponent.
+- Tradewater projects are those with "Tradewater" in the project name or proponent, plus the IDs in `scripts/extra-tradewater-projects.json` (currently ACR670, "TWRS 2", whose developer is Tradewater in the Berkeley data).
 - For each retirement, the buyer is the beneficiary if one is recorded, otherwise the registry account holder.
 - Names are cleaned so "Aledade, Inc" and "Aledade, Inc." count as one buyer.
 - `scripts/intermediaries.json` lists name fragments flagged as likely marketplaces or traders. It is a guess. Edit it and rebuild.
 
 ## Known limits
 
+- The data has no prices, deal stages or contacts. People, mutual connections and LinkedIn details must be typed in. The tool does not read LinkedIn.
 - About 59% of retired credits have no buyer recorded and about 14% were retired from Tradewater's own account.
 - Most of the "no buyer" credits (3.30M) were retired on 1 November of 2018, 2021 and 2022. That matches California compliance deadlines, but the data does not say so.
-- A retirement is a credit used by a buyer, not a sale by Tradewater. The data has no prices, deal stages or contacts.
-- Projects are selected by "Tradewater" in the name or proponent, plus the IDs in `scripts/extra-tradewater-projects.json` (currently ACR670, "TWRS 2", whose developer is Tradewater in the Berkeley data). Other missed projects are possible.
+- A retirement is a credit used by a buyer, not a sale by Tradewater.
+- The registry data is a snapshot (CarbonPlan to 2026-06-01, Berkeley to 2026-08-31). "Recent retirements" is not today's news.
+- Other missed Tradewater projects are possible.
+- Defaults I chose, which you can change in Settings: nurture again after 60 days (from "every couple of months") and a deal is quiet after 14 days.
 
 ## Data accuracy checks
 

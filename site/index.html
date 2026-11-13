@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tradewater buyer finder</title>
+  <title>Tradewater sales tool</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:wght@500;600&display=swap" rel="stylesheet">
@@ -12,20 +12,34 @@
 <body>
   <header class="top">
     <div class="wrap">
-      <a class="brand" href="#/">Tradewater buyer finder</a>
+      <a class="brand" href="#/">Tradewater sales tool</a>
       <nav aria-label="Sections">
-        <a href="#/" data-s="buyers">Buyers</a>
-        <a href="#/partners" data-s="partners">Partners</a>
-        <a href="#/leads" data-s="leads">Competitor buyers</a>
-        <a href="#/portfolio" data-s="portfolio">Portfolio</a>
+        <a href="#/" data-s="week">This week</a>
+        <a href="#/targets" data-s="targets">Targets</a>
+        <a href="#/accounts" data-s="accounts">Accounts</a>
+        <a href="#/deals" data-s="deals">Deals</a>
+        <a href="#/content" data-s="content">Content</a>
+        <a href="#/events" data-s="events">Events</a>
+        <a href="#/calendar" data-s="calendar">Calendar</a>
+        <a href="#/buyers" data-s="market">Market data</a>
+        <a href="#/settings" data-s="settings">Settings</a>
       </nav>
     </div>
     <div class="wrap"><span class="src" id="source"></span></div>
   </header>
   <main class="wrap" id="view" aria-live="polite"></main>
   <footer class="wrap foot" id="foot"></footer>
+  <script src="kit.js"></script>
   <script src="data.js"></script>
   <script src="portfolio.js"></script>
+  <script src="store.js"></script>
+  <script src="page-companies.js"></script>
+  <script src="page-deals.js"></script>
+  <script src="page-events.js"></script>
+  <script src="page-content.js"></script>
+  <script src="calendar.js"></script>
+  <script src="page-settings.js"></script>
+  <script src="page-week.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
