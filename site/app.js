@@ -33,7 +33,7 @@
   const state = { q: '', show: 'buyers', sort: 'total' };
 
   function listView() {
-    document.title = 'Tradewater sales tool';
+    document.title = 'Tradewater Sales Tool';
     const buyers = D.buyers;
     const people = buyers.filter(b => b.kind === 'buyer' || b.kind === 'account');
 
@@ -156,7 +156,7 @@
   function profileView(id) {
     const b = D.buyers.find(x => x.id === id);
     if (!b) return el('div', {}, el('a', { class: 'back', href: '#/buyers' }, 'Back to all buyers'), el('p', { class: 'empty' }, 'Buyer not found.'));
-    document.title = b.name + ' | Tradewater sales tool';
+    document.title = b.name + ' | Tradewater Sales Tool';
     const projById = Object.fromEntries(D.projects.map(p => [p.id, p]));
 
     const root = el('div');
@@ -213,7 +213,7 @@
   }
 
   function partnersView() {
-    document.title = 'Partners | Tradewater sales tool';
+    document.title = 'Partners | Tradewater Sales Tool';
     const partners = D.buyers.filter(b => b.kind === 'intermediary');
     const total = partners.reduce((s, b) => s + b.total, 0);
     const yearSet = new Set();
@@ -261,7 +261,7 @@
   const lstate = { q: '', show: 'buyers', type: 'all', sort: 'total' };
 
   function leadsView() {
-    document.title = 'Competitor buyers | Tradewater sales tool';
+    document.title = 'Competitor buyers | Tradewater Sales Tool';
     const lc = D.leadCoverage;
     const root = el('div');
     root.append(
@@ -330,7 +330,7 @@
   function leadView(id) {
     const l = D.leads.find(x => x.id === id);
     if (!l) return el('div', {}, el('a', { class: 'back', href: '#/leads' }, 'Back to competitor buyers'), el('p', { class: 'empty' }, 'Company not found.'));
-    document.title = l.name + ' | Tradewater sales tool';
+    document.title = l.name + ' | Tradewater Sales Tool';
     const root = el('div');
     root.append(
       el('a', { class: 'back', href: '#/leads' }, '← Competitor buyers'),
@@ -367,7 +367,7 @@
   const pstate = { q: '', status: 'all', type: 'all', remaining: 'all', sort: 'remaining' };
 
   function portfolioView() {
-    document.title = 'Portfolio | Tradewater sales tool';
+    document.title = 'Portfolio | Tradewater Sales Tool';
     const P = window.TW_PORTFOLIO;
     if (!P) return el('div', {}, el('h1', {}, 'Portfolio'), el('p', { class: 'empty' }, 'Portfolio data is missing. Run scripts/build-portfolio.mjs.'));
     const t = P.totals;

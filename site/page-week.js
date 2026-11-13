@@ -218,7 +218,7 @@
 
   /* ---------- the page ---------- */
   function weekPage() {
-    document.title = 'This week | Tradewater sales tool';
+    document.title = 'This week | Tradewater Sales Tool';
     const st = S.state();
     const empty = !st.companies.length && !st.deals.length && !st.events.length && !st.calls.length;
     const root = el('div');

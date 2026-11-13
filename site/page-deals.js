@@ -20,7 +20,7 @@
   }
 
   function listPage() {
-    document.title = 'Deals | Tradewater sales tool';
+    document.title = 'Deals | Tradewater Sales Tool';
     const root = el('div');
     root.append(el('h1', {}, 'Deals'),
       el('p', { class: 'lede' }, 'Companies considering a purchase. Keep a next step on every open deal so none go quiet.'));
@@ -69,7 +69,7 @@
   function dealPage(id) {
     const d = S.findDeal(id);
     if (!d) return el('div', {}, el('a', { class: 'back', href: '#/deals' }, '← Deals'), el('p', { class: 'empty' }, 'Deal not found.'));
-    document.title = (d.name || 'Deal') + ' | Tradewater sales tool';
+    document.title = (d.name || 'Deal') + ' | Tradewater Sales Tool';
     const set = (k, v) => { d[k] = v; S.save(); };
     const root = el('div');
     root.append(el('a', { class: 'back', href: '#/deals' }, '← Deals'), el('h1', {}, d.name || 'Untitled deal'));

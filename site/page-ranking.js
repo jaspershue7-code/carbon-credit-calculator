@@ -94,7 +94,7 @@
   }
 
   function rankingPage() {
-    document.title = 'Lead ranking | Tradewater sales tool';
+    document.title = 'Lead ranking | Tradewater Sales Tool';
     const D = window.TW_DATA;
     const root = el('div');
     root.append(el('h1', {}, 'Lead ranking'),

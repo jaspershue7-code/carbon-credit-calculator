@@ -7,14 +7,14 @@
   const notStarted = e => e.attendees.filter(a => a.outreach === 'Not started').length;
   const openFollowUps = e => e.followUps.filter(f => !f.done).length;
 
-  function listPage() {
-    document.title = 'Events | Tradewater sales tool';
+  // The events list now lives on the Calendar page. Each event still opens its own planning page.
+  function eventsSection() {
     const root = el('div');
-    root.append(el('h1', {}, 'Events'),
-      el('p', { class: 'lede' }, 'Conferences and events. Reach out to targets, customers and partners before, choose panels, and follow up fast afterwards.'));
+    root.append(el('h2', {}, 'Events'),
+      el('p', { class: 'muted' }, 'Conferences and events. Reach out to targets, customers and partners before, choose panels, and follow up fast afterwards.'));
     const nameIn = el('input', { type: 'text', placeholder: 'Event name', 'aria-label': 'Event name' });
-    const dateIn = el('input', { type: 'date', 'aria-label': 'Date' });
-    const locIn = el('input', { type: 'text', placeholder: 'City or venue', 'aria-label': 'Location' });
+    const dateIn = el('input', { type: 'date', 'aria-label': 'Event date' });
+    const locIn = el('input', { type: 'text', placeholder: 'City or venue', 'aria-label': 'Event location' });
     const add = () => {
       if (!nameIn.value.trim()) { nameIn.focus(); return; }
       const e = S.addEvent({ name: nameIn.value.trim(), date: dateIn.value, location: locIn.value.trim() });
@@ -22,7 +22,7 @@
     };
     root.append(el('div', { class: 'controls' },
       el('label', {}, 'Add an event', nameIn), el('label', {}, 'Date', dateIn), el('label', {}, 'Location', locIn),
-      el('label', {}, ' ', btn('Add', add, 'primary'))));
+      el('label', {}, ' ', btn('Add event', add, 'primary'))));
 
     const events = S.state().events;
     if (!events.length) { root.append(el('p', { class: 'empty' }, 'No events yet. Add the next conference you might attend.')); return root; }
@@ -38,18 +38,18 @@
         el('td', { class: 'num hide-sm' }, openFollowUps(e)))))));
     const upcoming = events.filter(e => !e.date || e.date >= t).sort((a, z) => (a.date || '9999').localeCompare(z.date || '9999'));
     const past = events.filter(e => e.date && e.date < t).sort((a, z) => z.date.localeCompare(a.date));
-    root.append(el('h2', {}, `Upcoming (${upcoming.length})`), upcoming.length ? table(upcoming) : el('p', { class: 'muted' }, 'None.'));
-    if (past.length) root.append(el('h2', {}, `Past (${past.length})`), table(past));
+    root.append(el('h3', {}, `Upcoming (${upcoming.length})`), upcoming.length ? table(upcoming) : el('p', { class: 'muted' }, 'None.'));
+    if (past.length) root.append(el('h3', {}, `Past (${past.length})`), table(past));
     return root;
   }
 
   function eventPage(id) {
     const e = S.findEvent(id);
-    if (!e) return el('div', {}, el('a', { class: 'back', href: '#/events' }, '← Events'), el('p', { class: 'empty' }, 'Event not found.'));
-    document.title = e.name + ' | Tradewater sales tool';
+    if (!e) return el('div', {}, el('a', { class: 'back', href: '#/calendar' }, '← Calendar'), el('p', { class: 'empty' }, 'Event not found.'));
+    document.title = e.name + ' | Tradewater Sales Tool';
     const set = (k, v) => { e[k] = v; S.save(); };
     const root = el('div');
-    root.append(el('a', { class: 'back', href: '#/events' }, '← Events'), el('h1', {}, e.name));
+    root.append(el('a', { class: 'back', href: '#/calendar' }, '← Calendar'), el('h1', {}, e.name));
     root.append(el('div', { class: 'form-grid' },
       field('Name', input(e.name, v => { if (v.trim()) { set('name', v.trim()); document.querySelector('h1').textContent = v.trim(); } })),
       field('Date', input(e.date, v => { set('date', v); }, { type: 'date' })),
@@ -123,14 +123,15 @@
       btn('Draft pre-event outreach', () => go('#/content/templates'))));
 
     root.append(el('h2', {}, 'Delete'), el('p', {}, btn('Delete this event', () => {
-      if (window.confirm(`Delete ${e.name}?`)) { S.state().events = S.state().events.filter(x => x.id !== e.id); S.save(); go('#/events'); }
+      if (window.confirm(`Delete ${e.name}?`)) { S.state().events = S.state().events.filter(x => x.id !== e.id); S.save(); go('#/calendar'); }
     }, 'danger')));
     return root;
   }
 
-  window.TWEvents = { notStarted, openFollowUps };
-  window.TWPages.events = listPage;
-  window.TWPages.events.section = 'events';
+  window.TWEvents = { notStarted, openFollowUps, section: eventsSection };
+  // Old links to the Events list now open the Calendar, where the list lives.
+  window.TWPages.events = arg => window.TWPages.calendar(arg);
+  window.TWPages.events.section = 'calendar';
   window.TWPages.event = eventPage;
-  window.TWPages.event.section = 'events';
+  window.TWPages.event.section = 'calendar';
 })();

@@ -47,7 +47,7 @@
   }
 
   function overviewPage() {
-    document.title = 'Tradewater sales tool';
+    document.title = 'Tradewater Sales Tool';
     const P = window.TW_PORTFOLIO;
     if (!P) return missing('Overview');
     const t = P.totals, R = P.reconcile, M = P.market;
@@ -82,7 +82,7 @@
       ? `Of the ${fmt(t.remaining)} credits remaining, ${pct(topShare, t.remaining)} come from the ${topV.sort().join(' and ')} vintages. Vintage is the year the emissions reduction happened.`
       : ''));
     const f2 = C().barChart(P.remainingByVintage, { highlight: y => topV.includes(String(y)), aria: 'Credits remaining by vintage' });
-    if (f2) root.append(C().figure(2, 'Credits remaining by vintage. The two largest are highlighted.', f2, SOURCE(P)));
+    if (f2) root.append(C().figure(2, 'Credits not yet used, by the year the reduction happened (the vintage). The two largest are highlighted.', f2, SOURCE(P)));
 
     // Market
     if (M) {
@@ -107,7 +107,7 @@
 
   /* ---------- Insights ---------- */
   function insightsPage() {
-    document.title = 'Insights | Tradewater sales tool';
+    document.title = 'Insights | Tradewater Sales Tool';
     const P = window.TW_PORTFOLIO;
     if (!P || !P.market) return missing('Insights');
     const M = P.market;

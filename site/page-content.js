@@ -267,7 +267,7 @@
   function contentPage(arg) {
     const parts = (arg || '').split('/');
     const tab = TABS.some(t => t[0] === parts[0]) ? parts[0] : 'posts';
-    document.title = 'Content | Tradewater sales tool';
+    document.title = 'Content | Tradewater Sales Tool';
     const root = el('div');
     root.append(el('h1', {}, 'Content'),
       el('p', { class: 'lede' }, 'Drafts for posts, the monthly newsletter, emails and proposals, and a library of due diligence answers.'),

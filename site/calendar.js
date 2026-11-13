@@ -95,7 +95,7 @@
   }
 
   function calendarPage(arg) {
-    document.title = 'Calendar | Tradewater sales tool';
+    document.title = 'Calendar | Tradewater Sales Tool';
     const T = today();
     if (/^\d{4}-\d{2}$/.test(arg)) { if (arg !== view.ym) { view.ym = arg; view.sel = ''; } }
     else if (view.ym !== T.slice(0, 7)) { view.ym = T.slice(0, 7); view.sel = ''; }
@@ -149,7 +149,9 @@
     root.append(el('h2', {}, 'Agenda'));
     if (overdue.length) root.append(el('h3', {}, 'Overdue'), itemTable(overdue, true, true));
     root.append(el('h3', {}, 'Next 30 days'), upcoming.length ? itemTable(upcoming, true) : el('p', { class: 'muted' }, 'Nothing in the next 30 days.'));
-    if (!all.length) root.append(el('p', { class: 'empty' }, 'Nothing is scheduled yet. Add a call above, set a next step on a deal, or add an event.'));
+    if (!all.length) root.append(el('p', { class: 'empty' }, 'Nothing is scheduled yet. Add a call above, set a next step on a deal, or add an event below.'));
+    // Events are planned from here: the list, the add form, and a link to each event's own page.
+    if (window.TWEvents && window.TWEvents.section) root.append(window.TWEvents.section());
     return root;
   }
 
@@ -157,7 +159,7 @@
   function callPage(id) {
     const c = S.findCall(id);
     if (!c) return el('div', {}, el('a', { class: 'back', href: '#/calendar' }, '← Calendar'), el('p', { class: 'empty' }, 'Call or meeting not found.'));
-    document.title = (c.title || 'Call') + ' | Tradewater sales tool';
+    document.title = (c.title || 'Call') + ' | Tradewater Sales Tool';
     const set = (k, v) => { c[k] = v; S.save(); };
     const root = el('div');
     root.append(el('a', { class: 'back', href: '#/calendar' }, '← Calendar'), el('h1', {}, c.title || 'Untitled'));

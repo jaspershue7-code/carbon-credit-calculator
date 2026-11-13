@@ -21,7 +21,7 @@ Work pages (your own entries), under the **My work** menu:
 - **Accounts:** customers and partners, linked to their registry record to show their usual buying month.
 - **Deals:** stages from initial meeting to closed, a next step and due date on each deal, and a dated log.
 - **Content:** LinkedIn post drafts built from the data, a monthly newsletter draft, email and message templates (cold email, warm intro, follow-up, nudge, event, proposal outline) that fill in known details, and a library of due diligence answers you write.
-- **Events:** who is going, outreach status for each, sessions to attend, and a checklist for before and after.
+- **Events** (on the Calendar page): the list of events and the add form sit at the bottom of the Calendar. Each event opens its own page with who is going, outreach status for each, sessions to attend, and a checklist for before and after.
 - **Calendar:** a month view, an agenda and a "Reminders now" list. It collects calls and meetings (with a time), events, deal next steps and next touch dates. Each item has a "Remind me" setting (on the day, 1 day, 3 days or 1 week before, default 1 day). The nav link shows how many reminders are due, and This week lists them at the top. Reminders show only when the tool is open. There is no email, phone or pop-up alert.
 - **Settings:** backup, restore, CSV import and review thresholds.
 
@@ -110,4 +110,4 @@ The portfolio page uses the Voluntary Registry Offsets Database, released under 
 
 ## About
 
-My name is Jasper Shue. The REC is super cool.
+Built by Jasper Shue as a sales tool for Tradewater's carbon credit work, using public registry data.

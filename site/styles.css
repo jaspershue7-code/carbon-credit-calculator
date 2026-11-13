@@ -235,3 +235,6 @@ td.row-actions .btn { margin: 2px 4px 2px 0; }
   .weight-row { grid-template-columns: 1fr auto; }
   .weight-row input[type=range] { grid-column: 1 / -1; order: 3; }
 }
+
+/* sub-headings inside a section get room above them (cards keep their own spacing) */
+main h3 { margin-top: 28px; }

@@ -57,7 +57,7 @@
   /* ---------- Targets and Accounts list ---------- */
   function listPage(kind) {
     const isT = kind === 'targets';
-    document.title = (isT ? 'Targets' : 'Accounts') + ' | Tradewater sales tool';
+    document.title = (isT ? 'Targets' : 'Accounts') + ' | Tradewater Sales Tool';
     const types = isT ? ['prospect'] : ['customer', 'partner'];
     const f = { q: '', status: 'all' };
     const root = el('div');
@@ -162,7 +162,7 @@
   function companyPage(id) {
     const c = S.findCompany(id);
     if (!c) return notFound('#/targets', 'Company not found. It may have been deleted.');
-    document.title = c.name + ' | Tradewater sales tool';
+    document.title = c.name + ' | Tradewater Sales Tool';
     const set = (k, v) => { c[k] = v; S.save(); };
     const root = el('div');
     root.append(el('a', { class: 'back', href: homeFor(c) }, '← ' + (c.type === 'prospect' ? 'Targets' : 'Accounts')), el('h1', {}, c.name));

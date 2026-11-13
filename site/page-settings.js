@@ -59,7 +59,7 @@
   }
 
   function settingsPage() {
-    document.title = 'Settings | Tradewater sales tool';
+    document.title = 'Settings | Tradewater Sales Tool';
     const st = S.state();
     const root = el('div');
     root.append(el('h1', {}, 'Settings and backup'),
