@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { extractZip } from './zip.mjs';
 
 const [cpDir, xlsx] = process.argv.slice(2);
 if (!cpDir || !xlsx) { console.error('Usage: node scripts/audit-data.mjs <CarbonPlan csv folder> <Berkeley xlsx>'); process.exit(1); }
@@ -28,8 +28,7 @@ const credits = parseCsv(fs.readFileSync(path.join(cpDir, 'credits.csv'), 'utf8'
 const meta = JSON.parse(fs.readFileSync(path.join(cpDir, 'metadata.json'), 'utf8'));
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-'));
-const tarBin = process.platform === 'win32' ? path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
-execFileSync(tarBin, ['-xf', path.resolve(xlsx), '-C', tmp, 'xl/sharedStrings.xml', 'xl/worksheets/sheet2.xml']);
+extractZip(xlsx, tmp, ['xl/sharedStrings.xml', 'xl/worksheets/sheet2.xml']);
 const dec = s => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
 const ss = [...fs.readFileSync(path.join(tmp, 'xl/sharedStrings.xml'), 'utf8').matchAll(/<si>([\s\S]*?)<\/si>/g)]
   .map(m => dec([...m[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(t => t[1]).join('')));

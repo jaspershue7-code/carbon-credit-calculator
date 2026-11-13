@@ -1,0 +1,4 @@
+# Netlify settings. The site is plain files in the "site" folder, so there is no build step.
+# Cloudflare Pages needs the same two settings entered in its dashboard: no build command, output directory "site".
+[build]
+  publish = "site"

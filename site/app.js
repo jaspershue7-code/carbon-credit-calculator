@@ -10,7 +10,7 @@
     none: 'No buyer recorded',
   };
   const KIND_HELP = {
-    intermediary: 'This looks like a marketplace, trader or program that resells credits (my guess from the name, not confirmed). Its customers are the real buyers.',
+    intermediary: 'This looks like a marketplace, trader or program that resells credits. Most of these labels were checked against company websites, and a few could not be confirmed (see the README). Its customers are the real buyers.',
     account: 'The registry names this as the account that retired the credits, not as the beneficiary. It may be the end buyer or a middleman.',
     tradewater: 'Credits retired from Tradewater\'s own registry account with no beneficiary named. The end buyer is not in this data.',
     none: 'Retirements where the registry shows neither a beneficiary nor a named account.',
@@ -227,7 +227,7 @@
         `${partners.length} marketplaces, traders and programs retired ${fmt(total)} Tradewater credits, ` +
         `${pct(total, cov.total)} of all retired credits. Their customers are the real buyers, so these are the accounts to ask for customer names.`),
       el('p', { class: 'note' },
-        'The partner flag comes from the name and is my guess, not confirmed. Edit scripts/intermediaries.json to change it.'));
+        'Partner flags were checked against company websites where possible, and a few could not be confirmed (see the README). Edit scripts/intermediaries.json to change them.'));
 
     root.append(el('div', { class: 'scroll' }, el('table', {},
       el('thead', {}, el('tr', {},
@@ -271,7 +271,7 @@
         `Registries name a buyer or account holder for ${pct(lc.named, lc.total)} of that volume, which gives ${D.leads.length} names.`),
       el('p', { class: 'note' },
         'A company here may already buy from Tradewater through a partner that does not name its customers. Check before reaching out. ' +
-        'Several are energy traders or brokers that retire credits for others.'));
+        'Several are energy retailers or marketers. They may retire credits for their own goals or for customers, and the registry does not say which.'));
 
     const search = el('input', { type: 'search', placeholder: 'Search company', value: lstate.q, 'aria-label': 'Search' });
     const show = el('select', { 'aria-label': 'Show' },
@@ -477,9 +477,8 @@
 
     root.append(el('h2', {}, 'Source'),
       el('p', { class: 'muted' },
-        'Portfolio data: Pamela Quartson, Barbara K Haya, Tyler Bernard, Aline Abayo, Xinyun Rong, Ivy S So, Micah Elias. (2026). ' +
-        'Voluntary Registry Offsets Database ' + P.version + ', Berkeley Carbon Trading Project, University of California, Berkeley. ' +
-        'https://gspp.berkeley.edu/berkeley-carbon-trading-project/offsets-database. Licensed CC BY 4.0. Projects were selected by "Tradewater" in the project name, developer, owner, operator or designee.'));
+        'Portfolio data: ' + (P.citation || ('Voluntary Registry Offsets Database ' + P.version + ', Berkeley Carbon Trading Project, University of California, Berkeley. https://gspp.berkeley.edu/berkeley-carbon-trading-project/offsets-database')) +
+        ' Licensed CC BY 4.0. Projects were selected by "Tradewater" in the project name, developer, owner, operator or designee.'));
     return root;
   }
 

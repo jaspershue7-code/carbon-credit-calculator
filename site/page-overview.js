@@ -143,7 +143,7 @@
         el('li', {}, 'Developer names are as the registries list them. Related companies can appear as separate developers, and Tradewater\'s several legal names are combined.'),
         el('li', {}, 'Credits issued are not credits sold, and a developer\'s share of issuance says little about its share of sales.'),
         el('li', {}, 'Retirements in compliance programs are recorded in lump years, which makes single years noisy.')),
-      el('p', { class: 'source' }, 'Cite as: Pamela Quartson, Barbara K Haya, Tyler Bernard, Aline Abayo, Xinyun Rong, Ivy S So, Micah Elias. (2026). Voluntary Registry Offsets Database ' + P.version + ', Berkeley Carbon Trading Project, University of California, Berkeley. Licensed CC BY 4.0.'));
+      el('p', { class: 'source' }, 'Cite as: ' + (P.citation || ('Voluntary Registry Offsets Database ' + P.version + ', Berkeley Carbon Trading Project, University of California, Berkeley.')) + ' Licensed CC BY 4.0.'));
     return root;
   }
 

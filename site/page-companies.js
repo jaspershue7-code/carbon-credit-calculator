@@ -37,7 +37,7 @@
     if (!rows.length) return null;
     const intro = kind === 'targets'
       ? 'Companies that retired the same credit types from other proponents, best fit first. Check each one before reaching out.'
-      : 'Names that retired Tradewater credits, best repeat-purchase fit first, then partners. A company may have bought through a partner, and marketplaces are listed as partners (my guess from the name).';
+      : 'Names that retired Tradewater credits, best repeat-purchase fit first, then partners. A company may have bought through a partner, and marketplaces are listed as partners (checked against company websites where possible).';
     return el('div', {},
       el('h2', {}, 'Suggested from the data'),
       el('p', { class: 'muted' }, intro, ' ', el('a', { href: '#/ranking' }, 'See the full ranking and how it is scored')),

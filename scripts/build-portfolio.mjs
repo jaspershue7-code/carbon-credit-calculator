@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { extractZip } from './zip.mjs';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -12,9 +12,7 @@ const xlsx = process.argv[2];
 if (!xlsx) { console.error('Usage: node scripts/build-portfolio.mjs <path to the Berkeley xlsx>'); process.exit(1); }
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'berkeley-'));
-// On Windows use the built-in bsdtar, because a Git Bash "tar" cannot read zip files.
-const tarBin = process.platform === 'win32' ? path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
-execFileSync(tarBin, ['-xf', path.resolve(xlsx), '-C', tmp,'xl/sharedStrings.xml', 'xl/worksheets/sheet2.xml', 'xl/worksheets/sheet1.xml']);
+extractZip(xlsx, tmp, ['xl/sharedStrings.xml', 'xl/worksheets/sheet2.xml', 'xl/worksheets/sheet1.xml']);
 
 const dec = s => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
 const ss = [...fs.readFileSync(path.join(tmp, 'xl/sharedStrings.xml'), 'utf8').matchAll(/<si>([\s\S]*?)<\/si>/g)]
@@ -33,6 +31,22 @@ for (const m of xml.matchAll(/<row [^>]*>([\s\S]*?)<\/row>/g)) {
   rows.push(o);
 }
 fs.rmSync(tmp, { recursive: true, force: true });
+
+// Read the version, the data-through date and the citation from the workbook itself, so a newer file is described correctly.
+const findText = re => ss.find(t => re.test(t));
+const versionText = findText(/^Voluntary Registry Offsets Database\s*-\s*v\d{4}-\d{2}/);
+const throughText = findText(/contains all projects[\s\S]*through [A-Z][a-z]+ \d{1,2}, \d{4}/);
+const citationText = findText(/Retrieved from: https:\/\/gspp\.berkeley\.edu/);
+const version = versionText && /v\d{4}-\d{2}[\w-]*/.exec(versionText)[0];
+const throughMatch = throughText && /through ([A-Z][a-z]+) (\d{1,2}), (\d{4})/.exec(throughText);
+if (!version || !throughMatch) {
+  console.error('Could not read the version and data-through date from the workbook. The file layout may have changed.');
+  process.exit(1);
+}
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const throughDate = `${throughMatch[3]}-${String(MONTHS.indexOf(throughMatch[1]) + 1).padStart(2, '0')}-${throughMatch[2].padStart(2, '0')}`;
+if (MONTHS.indexOf(throughMatch[1]) < 0) { console.error('Unrecognised month in the data-through date: ' + throughMatch[1]); process.exit(1); }
+const citation = citationText ? citationText.replace(/\s+/g, ' ').trim() : '';
 
 const hi = rows.findIndex(r => Object.values(r).includes('Project ID'));
 if (hi < 0 || rows[hi].A !== 'Project ID' || !/Credits\s+Issued/.test(rows[hi].P || '')) {
@@ -176,10 +190,11 @@ market.types.sort((a, z) => z.all.issued - a.all.issued);
 market.developerNames = [...new Set(sameType.filter(r => !twRows.has(r)).map(r => (r.O || '').trim()).filter(Boolean))].sort();
 
 const out = {
-  version: 'v2026-08',
+  version,
+  citation,
   market,
   byRegistry: group(projects, p => p.registry),
-  throughDate: '2026-08-31',
+  throughDate,
   totals: {
     projects: projects.length,
     issued: sum(projects, p => p.issued), retired: sum(projects, p => p.retired), remaining: sum(projects, p => p.remaining),

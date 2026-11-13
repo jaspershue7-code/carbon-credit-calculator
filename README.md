@@ -39,6 +39,42 @@ Nothing is pre-filled. Import deals or companies from a spreadsheet with Setting
 2. Run: `node scripts/build-data.mjs <that folder>`. This rewrites `site/data.js`.
 3. For the Portfolio page: `node scripts/build-portfolio.mjs <Berkeley xlsx> <CarbonPlan folder>`. This rewrites `site/portfolio.js`. The CarbonPlan folder is optional and adds the cross-check notes.
 
+## Share it as a link
+
+The site is plain files in the `site` folder, with no build step, so any static host works. Cloudflare Pages and Netlify are both free and can deploy from a private GitHub repo. Button names may differ slightly from these steps.
+
+- **Cloudflare Pages:** Workers and Pages, Create, Pages, Connect to Git, choose this repo. Leave the build command empty and set the output directory to `site`. Save and deploy, then copy the `pages.dev` link.
+- **Netlify:** Add new site, Import an existing project, choose this repo. Leave the build command empty and set the publish directory to `site` (`netlify.toml` already says so).
+
+Every push to `main` redeploys the site, including the daily data refresh below.
+
+Notes:
+- Anyone with the link can open it. Password protection is a paid feature on both hosts. The pages ask search engines not to index them, but that does not make the link private.
+- Each person's deals, contacts and events stay in their own browser. They are not shared between people, and they are not in the repo.
+- The data on the pages is public registry data. Registries may have their own terms (see Data terms below).
+
+## Daily data refresh
+
+`.github/workflows/refresh-data.yml` runs every day at about 06:23 UTC and can also be started by hand from the Actions tab. It runs `node scripts/refresh-data.mjs`, which:
+
+1. Asks CarbonPlan and Berkeley whether their files changed, without downloading them. CarbonPlan's file has a fixed address. Berkeley's address contains the version, so the script reads the newest link from Berkeley's page.
+2. If something changed, downloads both, rebuilds `site/data.js` and `site/portfolio.js`, and checks the result (project counts, totals, version and date, and no more than a 30% drop in Tradewater credits issued).
+3. Keeps the new files only if the checks pass. Otherwise it restores the old files and the job shows as failed, which also sends you a GitHub email.
+4. The workflow saves a commit only when files changed, and the host redeploys.
+
+Run it yourself with `node scripts/refresh-data.mjs` (add `--dry-run` to only look, `--force` to rebuild anyway, or `--cp-zip` and `--xlsx` to use local files). `scripts/source-state.json` records which versions were last used.
+
+Things that can stop it: Berkeley changing its page or file layout (the job fails and keeps the old data), a source being down, or GitHub pausing scheduled jobs on a quiet repo. Check the Actions tab now and then. The sources may update rarely: on 2026-11-12 CarbonPlan's file was still dated 2026-06-01.
+
+## Company labels
+
+Companies flagged as likely marketplaces, traders or program operators are listed in `scripts/intermediaries.json`. They were checked on 2026-11-12 against company websites and news by a research assistant, with a spot check of two by hand. Treat the result as a starting point, not proof.
+
+- **Reseller or marketplace (checked):** Patch, Cool Effect, Wren, Climate Impact Partners (also develops projects), 3Degrees (also develops projects), Bonneville Environmental Foundation, CNaught, CEEZER (the TradeCo entity itself was not confirmed), Rubicon Carbon Services, Karbon-X, Carbonzero, Restitution Brands (Terrapass), PDI Technologies (runs offset programs for fleet customers; its page does not say it retires the credits itself).
+- **Broker or trader:** STX Commodities, BGC Environmental Brokerage Services and Morgan Stanley Capital Group. The last two rest on search summaries because the primary pages did not load.
+- **Only partly right or unconfirmed:** Watershed (mainly carbon accounting software, with a credit marketplace as a side offering), First Climate Markets (develops and sells), Carbon Financial Services and ClearBlue Asset Management (no reliable source found), REMOVALL (may be a project developer), and "Climate Heroes" (a program name in registry notes; the owner was not found).
+- **Not marketplaces:** Just Energy, SouthStar and Interstate Gas Supply are energy retailers, Shell Energy and NRG Power Marketing are power marketers (low confidence), and Range Resources is an end buyer. They stay in the buyer lists.
+
 ## How buyers are decided
 
 - Tradewater projects are those with "Tradewater" in the project name or proponent, plus the IDs in `scripts/extra-tradewater-projects.json` (currently ACR670, "TWRS 2", whose developer is Tradewater in the Berkeley data).
