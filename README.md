@@ -10,7 +10,7 @@ Double-click `site/index.html`. No server or install needed.
 
 Work pages (your own entries):
 
-- **This week:** open deals with no next step, an overdue next step or no contact for a while; companies due for a touch; customers and partners that usually retire credits this month or next; events in the next 60 days; recent retirements in the data; touches logged in the last 7 days against a goal you set.
+- **This week:** a quick-add bar at the top (deal, target, call or event, press Enter), lead cards from the registry data with a peek at each company's history and an add button, and buttons on every row (log a touch, snooze, set a next step, mark a step or call done). When nothing is entered yet it shows only the add bar and the lead cards. Below that: open deals with no next step, an overdue next step or no contact for a while; companies due for a touch; customers and partners that usually retire credits this month or next; events in the next 60 days; recent retirements in the data; touches logged in the last 7 days against a goal you set.
 - **Targets:** companies you want to reach, with people, planned channel (warm intro, LinkedIn comment, LinkedIn message, cold email, conference), touch log and next touch date. Suggestions come from the registry data.
 - **Accounts:** customers and partners, linked to their registry record to show their usual buying month.
 - **Deals:** stages from initial meeting to closed, a next step and due date on each deal, and a dated log.

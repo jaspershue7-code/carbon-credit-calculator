@@ -136,3 +136,28 @@ ul.plain li { margin: 4px 0; max-width: 70ch; }
 .cal .count { font-size: 12px; line-height: 1; padding: 3px 6px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); }
 .cal .count.over { background: var(--warn-bg); color: var(--warn-text); }
 @media (max-width: 640px) { .cal .day { min-height: 46px; padding: 4px; } .cal-head { font-size: 13px; } .cal-head h2.plainh { font-size: 18px; } }
+
+/* ---------- this week: quick add, row actions, lead cards ---------- */
+.quick-add { margin-top: 24px; }
+[hidden], .controls label[hidden] { display: none !important; }
+.quick-add .controls { margin: 0 0 8px; align-items: flex-end; }
+.controls label.grow { flex: 1 1 260px; }
+.controls label.grow input { width: 100%; }
+.flash { color: var(--accent); margin: 6px 0 0; }
+
+.rowcard { padding: 12px 0; border-bottom: 1px solid var(--rule); }
+.rowcard-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.rowcard-head a { font-weight: 500; }
+.row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+td.row-actions { display: table-cell; white-space: nowrap; }
+td.row-actions .btn { margin: 2px 4px 2px 0; }
+.row-actions input[type=text] { flex: 1 1 200px; min-width: 0; width: auto; }
+.row-actions input[type=date], .row-actions select { width: auto; }
+
+.lead-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 16px; margin-top: 12px; }
+.lead-card { border: 1px solid var(--rule); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.lead-card p { margin: 0; font-size: 14px; }
+.lead-card summary { cursor: pointer; color: var(--accent); font-size: 14px; }
+.lead-card details ul { font-size: 14px; margin: 6px 0; padding-left: 18px; }
+.lead-card .row-actions { margin-top: auto; padding-top: 4px; }
+@media (max-width: 640px) { td.row-actions { white-space: normal; } }

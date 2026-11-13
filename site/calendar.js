@@ -20,20 +20,20 @@
     const compName = (id, fallback) => { const c = S.findCompany(id); return c ? c.name : fallback || ''; };
 
     st.calls.filter(c => !c.done && c.date).forEach(c => out.push({
-      kind: 'Call or meeting', date: c.date, time: c.time, title: c.title || 'Untitled', href: '#/call/' + c.id,
+      ref: { type: 'call', id: c.id }, kind: 'Call or meeting', date: c.date, time: c.time, title: c.title || 'Untitled', href: '#/call/' + c.id,
       sub: compName(c.companyId, c.companyName), remind: remindOf(c, 'remindDays'), movable: true,
     }));
     st.events.filter(e => e.date).forEach(e => out.push({
-      kind: 'Event', date: e.date, time: '', title: e.name, href: '#/event/' + e.id,
+      ref: { type: 'event', id: e.id }, kind: 'Event', date: e.date, time: '', title: e.name, href: '#/event/' + e.id,
       sub: `${window.TWEvents.notStarted(e)} outreach not started, ${window.TWEvents.openFollowUps(e)} tasks open`,
       remind: remindOf(e, 'remindDays'), expires: true,
     }));
     st.deals.filter(d => S.isOpenDeal(d) && d.nextStepDate).forEach(d => out.push({
-      kind: 'Deal next step', date: d.nextStepDate, time: '', title: `${d.nextStep || 'Next step'}: ${d.name || 'Untitled deal'}`, href: '#/deal/' + d.id,
+      ref: { type: 'deal', id: d.id }, kind: 'Deal next step', date: d.nextStepDate, time: '', title: `${d.nextStep || 'Next step'}: ${d.name || 'Untitled deal'}`, href: '#/deal/' + d.id,
       sub: compName(d.companyId, d.companyName), remind: remindOf(d, 'nextStepRemind'),
     }));
     st.companies.filter(c => c.nextTouch && c.status !== 'Not a fit').forEach(c => out.push({
-      kind: 'Touch', date: c.nextTouch, time: '', title: 'Reach out: ' + c.name, href: '#/company/' + c.id,
+      ref: { type: 'company', id: c.id }, kind: 'Touch', date: c.nextTouch, time: '', title: 'Reach out: ' + c.name, href: '#/company/' + c.id,
       sub: c.channel || '', remind: remindOf(c, 'nextTouchRemind'),
     }));
     out.forEach(i => { i.days = daysBetween(today(), i.date); });
@@ -44,15 +44,30 @@
   const reminders = () => items().filter(i => i.days <= i.remind);
 
   /* ---------- shared row ---------- */
-  function itemRow(i, withDate) {
+  // One-click buttons for an agenda item.
+  function actionsFor(i) {
+    const A = window.TWActions, R = i.ref;
+    if (!R) return [];
+    const snz = (obj, key) => btn('Snooze 1 day', () => A.snooze(obj, key, 1), 'small');
+    if (R.type === 'call') {
+      const c = S.findCall(R.id);
+      return c ? [btn('Done', () => A.callDone(c, false), 'small'), S.findCompany(c.companyId) ? btn('Done and log touch', () => A.callDone(c, true), 'small') : null, snz(c, 'date')] : [];
+    }
+    if (R.type === 'deal') { const d = S.findDeal(R.id); return d ? [btn('Step done', () => A.stepDone(d), 'small'), snz(d, 'nextStepDate')] : []; }
+    if (R.type === 'company') { const c = S.findCompany(R.id); return c ? [btn('Log touch', () => A.logTouch(c), 'small'), snz(c, 'nextTouch')] : []; }
+    return [];
+  }
+
+  function itemRow(i, withDate, withActions) {
     return el('tr', {},
       withDate ? el('td', { class: 'date' }, dayLabel(i.date), el('br'), el('span', { class: i.days < 0 ? 'tag warn' : 'muted' }, relative(i.days))) : null,
       el('td', { class: 'date' }, fmtTime(i.time)),
       el('td', {}, el('span', { class: 'tag' }, i.kind)),
       el('td', { class: 'name' }, el('a', { href: i.href }, i.title), i.sub ? el('span', { class: 'muted' }, ' ' + i.sub) : null),
-      el('td', { class: 'hide-sm muted' }, remindText(i.remind)));
+      el('td', { class: 'hide-sm muted' }, remindText(i.remind)),
+      withActions ? el('td', { class: 'row-actions' }, actionsFor(i)) : null);
   }
-  const itemTable = (list, withDate) => el('div', { class: 'scroll' }, el('table', {}, el('tbody', {}, list.map(i => itemRow(i, withDate)))));
+  const itemTable = (list, withDate, withActions) => el('div', { class: 'scroll' }, el('table', {}, el('tbody', {}, list.map(i => itemRow(i, withDate, withActions)))));
 
   /* ---------- calendar page ---------- */
   const view = { ym: '', sel: '' };
@@ -114,7 +129,7 @@
 
     // Reminders now
     const due = all.filter(i => i.days <= i.remind);
-    if (due.length) root.append(el('h2', {}, `Reminders now (${due.length})`), itemTable(due, true));
+    if (due.length) root.append(el('h2', {}, `Reminders now (${due.length})`), itemTable(due, true, true));
 
     // Month
     root.append(el('div', { class: 'cal-head' },
@@ -132,7 +147,7 @@
     const overdue = all.filter(i => i.days < 0);
     const upcoming = all.filter(i => i.days >= 0 && i.days <= 30);
     root.append(el('h2', {}, 'Agenda'));
-    if (overdue.length) root.append(el('h3', {}, 'Overdue'), itemTable(overdue, true));
+    if (overdue.length) root.append(el('h3', {}, 'Overdue'), itemTable(overdue, true, true));
     root.append(el('h3', {}, 'Next 30 days'), upcoming.length ? itemTable(upcoming, true) : el('p', { class: 'muted' }, 'Nothing in the next 30 days.'));
     if (!all.length) root.append(el('p', { class: 'empty' }, 'Nothing is scheduled yet. Add a call above, set a next step on a deal, or add an event.'));
     return root;
