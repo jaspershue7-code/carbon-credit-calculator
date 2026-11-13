@@ -22,10 +22,12 @@
     const have = new Set(S.state().companies.map(c => S.nameKey(c.name)));
     let items;
     if (kind === 'targets') {
-      items = D.leads.filter(l => l.kind === 'buyer' || l.kind === 'account').map(e => ({ e, type: 'prospect', refType: 'lead' }));
+      // Best fit first, from the lead ranking.
+      items = window.TWScore.rank('new').map(r => ({ e: r.e, type: 'prospect', refType: 'lead', r }));
     } else {
-      items = D.buyers.filter(b => ['buyer', 'account', 'intermediary'].includes(b.kind))
-        .map(e => ({ e, type: e.kind === 'intermediary' ? 'partner' : 'customer', refType: 'buyer' }));
+      const customers = window.TWScore.rank('repeat').map(r => ({ e: r.e, type: 'customer', refType: 'buyer', r }));
+      const partners = D.buyers.filter(b => b.kind === 'intermediary').map(e => ({ e, type: 'partner', refType: 'buyer' }));
+      items = customers.filter(i => !have.has(S.nameKey(i.e.name))).slice(0, 6).concat(partners.filter(i => !have.has(S.nameKey(i.e.name))).slice(0, 2));
     }
     return items.filter(i => !have.has(S.nameKey(i.e.name))).slice(0, 8);
   }
@@ -34,14 +36,16 @@
     const rows = suggestionRows(kind);
     if (!rows.length) return null;
     const intro = kind === 'targets'
-      ? 'Companies that retired the same credit types from other proponents and have no retirement from a Tradewater project in the data. Check each one before reaching out.'
-      : 'Names that retired Tradewater credits in the registry data. A company may have bought through a partner, and marketplaces are listed as partners (my guess from the name).';
+      ? 'Companies that retired the same credit types from other proponents, best fit first. Check each one before reaching out.'
+      : 'Names that retired Tradewater credits, best repeat-purchase fit first, then partners. A company may have bought through a partner, and marketplaces are listed as partners (my guess from the name).';
     return el('div', {},
       el('h2', {}, 'Suggested from the data'),
-      el('p', { class: 'muted' }, intro),
-      el('div', { class: 'scroll' }, el('table', {}, el('tbody', {}, rows.map(({ e, type, refType }) =>
+      el('p', { class: 'muted' }, intro, ' ', el('a', { href: '#/ranking' }, 'See the full ranking and how it is scored')),
+      el('div', { class: 'scroll' }, el('table', {}, el('tbody', {}, rows.map(({ e, type, refType, r }) =>
         el('tr', {},
-          el('td', { class: 'name' }, e.name, e.kind !== 'buyer' && e.kind !== 'account' ? el('span', { class: 'tag' }, 'likely marketplace or trader') : null),
+          el('td', { class: 'name' }, e.name, e.kind !== 'buyer' && e.kind !== 'account' ? el('span', { class: 'tag' }, 'likely marketplace or trader') : null,
+            r ? el('span', { class: 'tag' }, 'fit ' + r.score) : null,
+            r ? el('div', { class: 'muted small' }, (window.TWScore.topReasons(r, 2).join('; ') || 'weak match') + '.') : null),
           el('td', { class: 'num' }, fmt(e.total) + ' credits'),
           el('td', { class: 'date hide-sm' }, e.last ? 'last ' + e.last : ''),
           el('td', {}, btn('Add as ' + typeLabel(type).toLowerCase(), () => {

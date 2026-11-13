@@ -176,24 +176,26 @@
     const D = window.TW_DATA;
     if (!D) return null;
     const have = new Set(st.companies.map(c => S.nameKey(c.name)));
+    // Scored by the lead ranking, best fit first.
     const pool = [];
-    D.leads.filter(l => l.kind === 'buyer' || l.kind === 'account').forEach(e => pool.push({ e, type: 'prospect', ref: 'lead', tag: 'Retired other proponents\' credits' }));
-    D.buyers.filter(b => b.kind === 'buyer' || b.kind === 'account').forEach(e => pool.push({ e, type: 'customer', ref: 'buyer', tag: 'Retired Tradewater credits' }));
+    window.TWScore.rank('new').forEach(r => pool.push({ e: r.e, r, type: 'prospect', ref: 'lead', tag: 'Retired other proponents\' credits' }));
+    window.TWScore.rank('repeat').forEach(r => pool.push({ e: r.e, r, type: 'customer', ref: 'buyer', tag: 'Retired Tradewater credits' }));
     const list = pool.filter(p => !have.has(S.nameKey(p.e.name)))
-      .sort((a, z) => (z.e.last || '').localeCompare(a.e.last || '') || z.e.total - a.e.total);
+      .sort((a, z) => z.r.score - a.r.score || z.e.total - a.e.total);
     if (!list.length) return null;
     const PAGE = 6;
     const start = ui.leadOffset % list.length;
     const shown = list.slice(start, start + PAGE).concat(start + PAGE > list.length ? list.slice(0, start + PAGE - list.length) : []).slice(0, PAGE);
 
-    const cards = shown.map(({ e, type, ref, tag }) => {
+    const cards = shown.map(({ e, r, type, ref, tag }) => {
       const um = S.usualMonths(e);
       const latest = e.tx.slice(0, 3).map(t => `${t[0] || 'no date'}: ${fmt(t[1])} credits`);
       const label = type === 'prospect' ? 'Add as target' : 'Add as customer';
       return el('div', { class: 'lead-card' },
         el('b', {}, e.name),
-        el('div', {}, el('span', { class: 'tag' }, tag)),
+        el('div', {}, el('span', { class: 'tag' }, tag), el('span', { class: 'tag' }, 'fit ' + r.score)),
         el('p', { class: 'muted' }, `${fmt(e.total)} credits retired, last on ${e.last || 'an unknown date'}.`),
+        el('p', { class: 'muted' }, (window.TWScore.topReasons(r, 2).join('; ') || 'A weak match') + '.'),
         el('details', {}, el('summary', {}, 'Peek at their history'),
           el('ul', { class: 'plain' },
             el('li', {}, `${e.count} retirement${e.count === 1 ? '' : 's'} over ${e.yearsActive} year${e.yearsActive === 1 ? '' : 's'}, ${e.first || '?'} to ${e.last || '?'}.`),
@@ -208,7 +210,8 @@
           el('a', { href: (ref === 'lead' ? '#/lead/' : '#/buyer/') + encodeURIComponent(e.id) }, 'Full history')));
     });
     return section('Leads from the registry data',
-      `Real companies from registry records, most recent first. Peek at their history and add the ones worth reaching out to. Data is a snapshot to ${D.generatedAt.slice(0, 10)}. Names may have bought through a partner, so check before contacting.`,
+      `Real companies from registry records, best fit first. Peek at their history and add the ones worth reaching out to. Data is a snapshot to ${D.generatedAt.slice(0, 10)}. Names may have bought through a partner, so check before contacting. `,
+      el('p', {}, el('a', { href: '#/ranking' }, 'See the full ranking and how it is scored')),
       el('div', { class: 'lead-grid' }, cards),
       list.length > PAGE ? el('p', {}, btn('Show other leads', () => { ui.leadOffset += PAGE; K.refresh(); }, 'small'), el('span', { class: 'muted' }, ` ${list.length} available`)) : null);
   }

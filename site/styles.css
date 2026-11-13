@@ -217,3 +217,21 @@ td.row-actions .btn { margin: 2px 4px 2px 0; }
   /* Charts scale down to the screen width, so their text needs a larger size in chart units. */
   .chart text { font-size: 21px; }
 }
+
+/* ---------- lead ranking ---------- */
+.ranked .rowcard-head { align-items: center; gap: 12px; }
+.score { font: 500 26px/1 var(--serif); min-width: 40px; text-align: right; font-variant-numeric: lining-nums; }
+.rankname { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; }
+.ranked .reasons { margin: 6px 0 4px 52px; font-size: 14px; }
+.ranked details { margin: 4px 0 0 52px; font-size: 14px; }
+.ranked details summary { cursor: pointer; text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+.ranked .row-actions { margin-left: 52px; }
+.weight-row { display: grid; grid-template-columns: minmax(180px, 1.4fr) minmax(120px, 1fr) 80px; gap: 16px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--rule); }
+.weight-row input[type=range] { width: 100%; accent-color: var(--accent); padding: 0; border: 0; background: transparent; }
+.small { font-size: 12.5px; }
+.wval { font-variant-numeric: tabular-nums; text-align: right; font-size: 14px; }
+@media (max-width: 720px) {
+  .ranked .reasons, .ranked details, .ranked .row-actions { margin-left: 0; }
+  .weight-row { grid-template-columns: 1fr auto; }
+  .weight-row input[type=range] { grid-column: 1 / -1; order: 3; }
+}

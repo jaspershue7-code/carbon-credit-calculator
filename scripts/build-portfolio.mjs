@@ -172,6 +172,8 @@ for (const type of twTypeNames) {
 market.all = rnd(market.all); market.tradewater = rnd(market.tradewater);
 for (const side of ['tradewater', 'others']) for (const k of ['issuedByVintage', 'retiredByYear']) for (const y of Object.keys(market[k][side])) market[k][side][y] = Math.round(market[k][side][y]);
 market.types.sort((a, z) => z.all.issued - a.all.issued);
+// Every other developer of these project types, so the lead ranking can leave out competitors that show up as account holders.
+market.developerNames = [...new Set(sameType.filter(r => !twRows.has(r)).map(r => (r.O || '').trim()).filter(Boolean))].sort();
 
 const out = {
   version: 'v2026-08',

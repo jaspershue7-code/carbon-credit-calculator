@@ -99,6 +99,7 @@
       el('ul', { class: 'plain' },
         el('li', {}, el('a', { href: '#/buyers' }, 'Market data'), ': who has retired Tradewater credits, which partners resell them, and companies buying the same credit types elsewhere.'),
         el('li', {}, el('a', { href: '#/insights' }, 'Insights'), ': the full developer comparison for each project type.'),
+        el('li', {}, el('a', { href: '#/ranking' }, 'Lead ranking'), ': companies worth a conversation, with the reasons for each score.'),
         el('li', {}, el('a', { href: '#/content/newsletter' }, 'Content'), ': post and newsletter drafts built from these numbers.')),
       workStrip());
     return root;
