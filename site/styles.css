@@ -1,0 +1,82 @@
+:root {
+  --bg: #ffffff;
+  --text: #0f1b2d;
+  --muted: #5b6676;
+  --rule: #e3e6ea;
+  --accent: #1f6f5c;
+  --accent-soft: #e8f1ee;
+  --warn-bg: #faf5e8;
+  --warn-text: #6b5313;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1722; --text: #e8ecf1; --muted: #98a3b3; --rule: #263142;
+    --accent: #5fc2a8; --accent-soft: #15302a; --warn-bg: #2a2412; --warn-text: #e6cf8a;
+  }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 400 16px/1.55 "IBM Plex Sans", system-ui, sans-serif;
+}
+.wrap { max-width: 960px; margin: 0 auto; padding: 0 16px; }
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+
+.top { border-bottom: 1px solid var(--rule); }
+.top .wrap { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding-top: 14px; padding-bottom: 14px; flex-wrap: wrap; }
+.brand { font: 600 18px "Source Serif 4", Georgia, serif; color: var(--text); text-decoration: none; }
+.src { color: var(--muted); font-size: 14px; }
+
+.top .wrap + .wrap { padding-top: 0; padding-bottom: 10px; display: block; }
+nav { display: flex; gap: 20px; flex-wrap: wrap; font-size: 15px; }
+nav a { color: var(--muted); text-decoration: none; padding-bottom: 2px; border-bottom: 2px solid transparent; }
+nav a[aria-current="page"] { color: var(--text); border-bottom-color: var(--accent); }
+.scroll { overflow-x: auto; }
+
+h1, h2 { font-family: "Source Serif 4", Georgia, serif; font-weight: 600; line-height: 1.2; margin: 0; }
+h1 { font-size: 36px; margin-top: 40px; }
+h2 { font-size: 22px; margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--rule); }
+.lede { max-width: 66ch; margin: 12px 0 0; font-size: 17px; }
+.muted { color: var(--muted); }
+.note { background: var(--warn-bg); color: var(--warn-text); padding: 12px 14px; margin: 20px 0 0; max-width: 72ch; font-size: 15px; }
+
+.controls { display: flex; gap: 12px; flex-wrap: wrap; margin: 28px 0 8px; }
+.controls label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.controls input, .controls select {
+  font: inherit; color: var(--text); background: var(--bg);
+  border: 1px solid var(--rule); border-radius: 4px; padding: 8px 10px; min-width: 190px;
+}
+.controls input:focus-visible, .controls select:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+th, td { text-align: left; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-weight: 500; font-size: 13px; color: var(--muted); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; padding-right: 16px; }
+td.name a { font-weight: 500; }
+td.date { white-space: nowrap; }
+.tag { display: inline-block; font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 3px; padding: 0 6px; margin-left: 8px; white-space: nowrap; }
+.empty { padding: 24px 0; color: var(--muted); }
+
+.back { display: inline-block; margin-top: 28px; font-size: 14px; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0 24px; margin: 24px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--rule); }
+.facts li { padding: 12px 0; border-bottom: 1px solid var(--rule); }
+.facts b { display: block; font-size: 20px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.facts span { font-size: 13px; color: var(--muted); }
+
+.chart { width: 100%; height: auto; display: block; margin-top: 12px; }
+.chart text { fill: var(--muted); font: 13px "IBM Plex Sans", sans-serif; }
+.chart rect { fill: var(--accent); }
+
+.cov td:first-child { width: 55%; }
+.foot { padding-top: 32px; padding-bottom: 48px; color: var(--muted); font-size: 13px; }
+
+@media (max-width: 640px) {
+  h1 { font-size: 28px; margin-top: 28px; }
+  .hide-sm { display: none; }
+  .controls input, .controls select { min-width: 0; width: 100%; }
+  .controls label { flex: 1 1 100%; }
+  th, td { padding-right: 8px; }
+  td.name { word-break: break-word; }
+}
