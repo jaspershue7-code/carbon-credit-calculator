@@ -176,10 +176,9 @@
     const D = window.TW_DATA;
     if (!D) return null;
     const have = new Set(st.companies.map(c => S.nameKey(c.name)));
-    // Scored by the lead ranking, best fit first.
+    // New prospects only, scored by the lead ranking, best fit first. Past Tradewater buyers are on the Lead ranking page.
     const pool = [];
     window.TWScore.rank('new').forEach(r => pool.push({ e: r.e, r, type: 'prospect', ref: 'lead', tag: 'Retired other proponents\' credits' }));
-    window.TWScore.rank('repeat').forEach(r => pool.push({ e: r.e, r, type: 'customer', ref: 'buyer', tag: 'Retired Tradewater credits' }));
     const list = pool.filter(p => !have.has(S.nameKey(p.e.name)))
       .sort((a, z) => z.r.score - a.r.score || z.e.total - a.e.total);
     if (!list.length) return null;
