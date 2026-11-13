@@ -40,7 +40,11 @@ const metadata = JSON.parse(read('metadata.json'));
 const intermediaries = JSON.parse(fs.readFileSync(path.join(here, 'intermediaries.json'), 'utf8'));
 
 const num = v => parseFloat(v) || 0;
-const isTradewater = p => /tradewater/i.test(p.name) || /tradewater/i.test(p.proponent);
+// Projects that are Tradewater's per the Berkeley database (developer field) but do not say so in CarbonPlan's name or proponent.
+// IDs are compared without leading zeros, so ACR0670 and ACR670 are the same project.
+const normId = id => id.replace(/^([A-Za-z]+)0+(\d)/, '$1$2').toUpperCase();
+const extraIds = new Set(JSON.parse(fs.readFileSync(path.join(here, 'extra-tradewater-projects.json'), 'utf8')).map(normId));
+const isTradewater = p => /tradewater/i.test(p.name) || /tradewater/i.test(p.proponent) || extraIds.has(normId(p.project_id));
 
 const twProjects = projects.filter(isTradewater);
 const twIds = new Set(twProjects.map(p => p.project_id));
@@ -68,7 +72,8 @@ function nameKey(name) {
 const slug = key => key.replace(/ /g, '-') || 'unnamed';
 
 const buyers = new Map();
-const cover = { total: 0, beneficiary: 0, account: 0, tradewaterOwn: 0, unnamed: 0 };
+const nov1Years = new Set();
+const cover = { total: 0, beneficiary: 0, account: 0, tradewaterOwn: 0, unnamed: 0, unnamedNov1: 0 };
 const noteSnip = s => (s || '').replace(/\s+/g, ' ').trim().slice(0, 160);
 
 for (const c of credits) {
@@ -83,7 +88,10 @@ for (const c of credits) {
   if (ben) { name = ben; via = 'beneficiary'; cover.beneficiary += qty; }
   else if (/^tradewater/i.test(acct)) { cover.tradewaterOwn += qty; name = 'Tradewater (retired from its own account)'; via = 'tradewater'; }
   else if (acct && !/^\d+$/.test(acct)) { name = acct; via = 'account'; cover.account += qty; }
-  else { cover.unnamed += qty; name = 'No buyer recorded'; via = 'none'; }
+  else {
+    cover.unnamed += qty; name = 'No buyer recorded'; via = 'none';
+    if ((c.transaction_date || '').slice(5, 10) === '11-01') { cover.unnamedNov1 += qty; nov1Years.add(c.transaction_date.slice(0, 4)); }   // 1 November looks like a compliance deadline
+  }
 
   const key = via === 'tradewater' ? 'tradewater-own' : via === 'none' ? 'no-buyer-recorded' : nameKey(name);
   if (!key) continue;
@@ -179,6 +187,7 @@ const leadOut = [...leads.values()].map(l => {
 
 const data = {
   generatedAt: metadata.generated_at,
+  unnamedNov1Years: [...nov1Years].sort(),
   leadTypes: [...twTypes],
   leadCoverage: { total: Math.round(leadCover.total), named: Math.round(leadCover.named) },
   leads: leadOut,

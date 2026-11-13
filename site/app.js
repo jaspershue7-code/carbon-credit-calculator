@@ -3,6 +3,8 @@
   const view = document.getElementById('view');
   const fmt = n => Math.round(n).toLocaleString('en-US');
   const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0) + '%';
+  // Compact numbers for chart labels so neighbouring bars do not collide.
+  const short = n => n >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'K' : fmt(n);
 
   // Small element helper. Text always goes in as text, never as HTML.
   function el(tag, attrs, ...kids) {
@@ -32,11 +34,13 @@
   const cov = D.coverage;
   const identifiable = cov.beneficiary + cov.account;
 
-  document.getElementById('source').textContent =
-    D.source + ', snapshot of ' + D.generatedAt.slice(0, 10);
+  const sourceEl = document.getElementById('source');
+  const sourceText = section => section === 'portfolio' && window.TW_PORTFOLIO
+    ? 'Berkeley Carbon Trading Project, ' + window.TW_PORTFOLIO.version + ', through ' + window.TW_PORTFOLIO.throughDate
+    : D.source + ', snapshot of ' + D.generatedAt.slice(0, 10);
   document.getElementById('foot').textContent =
-    'Data: CarbonPlan OffsetsDB, from public registry records (ACR, Verra, Climate Action Reserve). ' +
-    'Provided as is. Registries may have their own terms on this data. A "retirement" is a credit used by a buyer, not a sale by Tradewater.';
+    'Data: CarbonPlan OffsetsDB (buyer, partner and competitor pages) and the Berkeley Carbon Trading Project Voluntary Registry Offsets Database (portfolio page), ' +
+    'both from public registry records. Provided as is. Registries may have their own terms on this data. A "retirement" is a credit used by a buyer, not a sale by Tradewater.';
 
   /* ---------- list view ---------- */
   const state = { q: '', show: 'buyers', sort: 'total' };
@@ -56,6 +60,8 @@
       el('p', { class: 'note' },
         `${pct(cov.unnamed, cov.total)} of retired credits have no buyer recorded and ` +
         `${pct(cov.tradewaterOwn, cov.total)} were retired from Tradewater's own account. ` +
+        (cov.unnamedNov1 ? `${fmt(cov.unnamedNov1)} of the credits with no buyer were retired on 1 November of ${D.unnamedNov1Years.join(', ')}, ` +
+          'a pattern that matches California compliance deadlines, but the data does not say so. ' : '') +
         'Treat this list as a set of leads, not a full customer list.')
     );
 
@@ -155,7 +161,7 @@
       const x = 10 + i * step + (step - bw) / 2;
       add('rect', { x, y: H - pad - h, width: bw, height: h });
       add('text', { x: x + bw / 2, y: H - 6, 'text-anchor': 'middle' }, y);
-      if (v) add('text', { x: x + bw / 2, y: H - pad - h - 5, 'text-anchor': 'middle' }, fmt(v));
+      if (v) add('text', { x: x + bw / 2, y: H - pad - h - 5, 'text-anchor': 'middle' }, short(v));
     });
     return svg;
   }
@@ -365,15 +371,137 @@
     return root;
   }
 
+  /* ---------- portfolio view (Berkeley data) ---------- */
+  const pstate = { q: '', status: 'all', type: 'all', remaining: 'all', sort: 'remaining' };
+
+  function portfolioView() {
+    document.title = 'Portfolio | Tradewater buyer finder';
+    const P = window.TW_PORTFOLIO;
+    if (!P) return el('div', {}, el('h1', {}, 'Portfolio'), el('p', { class: 'empty' }, 'Portfolio data is missing. Run scripts/build-portfolio.mjs.'));
+    const t = P.totals;
+    const root = el('div');
+    root.append(
+      el('h1', {}, 'Tradewater portfolio'),
+      el('p', { class: 'lede' },
+        `${t.projects} projects have issued ${fmt(t.issued)} credits. ${fmt(t.retired)} (${pct(t.retired, t.issued)}) are retired and ` +
+        `${fmt(t.remaining)} (${pct(t.remaining, t.issued)}) remain. Data through ${P.throughDate}.`),
+      el('p', { class: 'note' },
+        'Remaining means issued minus retired in the registries. It does not mean unsold: some buyers hold credits or retire them without telling the registry. ' +
+        'Some retirement years include California compliance retirements, which are recorded in a single year.'));
+    const R = P.reconcile;
+    if (R && R.cancelled) {
+      root.append(el('p', { class: 'note' },
+        `${fmt(R.cancelled)} of the remaining credits, on ${R.cancelledProjects} projects, are shown as cancelled in CarbonPlan's records. ` +
+        `Berkeley still counts them as remaining. Without them, remaining is ${fmt(t.remaining - R.cancelled)}. The reason for the cancellations is not in the data. ` +
+        'Several of these projects are labeled Washington Ecology (ECY), so they may have moved to that program, but that is not confirmed.'));
+    }
+    if (R) {
+      root.append(el('p', { class: 'note' },
+        `The buyer pages use CarbonPlan data to ${R.carbonplanSnapshot} and show ${fmt(R.carbonplanRetired)} credits retired on ${R.matched} projects. ` +
+        `This page shows ${fmt(R.berkeleyRetired)} on those projects plus ${R.notInCarbonPlan} newer ones with no credits yet. ` +
+        `Of the ${fmt(R.berkeleyRetired - R.carbonplanRetired)} difference, ${fmt(R.diffComplianceProjects)} is on California compliance projects ` +
+        `(Berkeley counts compliance retirements that CarbonPlan lacks) and ${fmt(R.diffOther)} is on other projects, probably newer retirements.`));
+    }
+    root.append(el('ul', { class: 'facts' },
+        el('li', {}, el('b', {}, fmt(t.issued)), el('span', {}, 'credits issued')),
+        el('li', {}, el('b', {}, fmt(t.retired)), el('span', {}, 'credits retired')),
+        el('li', {}, el('b', {}, fmt(t.remaining)), el('span', {}, 'credits remaining')),
+        el('li', {}, el('b', {}, t.projects), el('span', {}, 'projects'))));
+
+    const c1 = yearChart(P.remainingByVintage);
+    if (c1) root.append(el('h2', {}, 'Remaining credits by vintage'),
+      el('p', { class: 'muted' }, 'Vintage is the year the emissions reduction happened.'), c1);
+    const c2 = yearChart(P.retiredByYear);
+    if (c2) root.append(el('h2', {}, 'Credits retired per year'), c2);
+
+    const groupTable = (title, list) => el('div', {},
+      el('h2', {}, title),
+      el('div', { class: 'scroll' }, el('table', {},
+        el('thead', {}, el('tr', {},
+          el('th', {}, title.replace('By ', '').replace(/^./, c => c.toUpperCase())),
+          el('th', { class: 'num hide-sm' }, 'Projects'), el('th', { class: 'num' }, 'Issued'),
+          el('th', { class: 'num hide-sm' }, 'Retired'), el('th', { class: 'num' }, 'Remaining'))),
+        el('tbody', {}, list.map(g => el('tr', {},
+          el('td', {}, g.name),
+          el('td', { class: 'num hide-sm' }, g.projects), el('td', { class: 'num' }, fmt(g.issued)),
+          el('td', { class: 'num hide-sm' }, fmt(g.retired)), el('td', { class: 'num' }, fmt(g.remaining))))))));
+    root.append(groupTable('By project type', P.byType), groupTable('By status', P.byStatus), groupTable('By country', P.byCountry));
+
+    root.append(el('h2', {}, 'Projects'));
+    const search = el('input', { type: 'search', placeholder: 'Search project ID or name', value: pstate.q, 'aria-label': 'Search' });
+    const status = el('select', { 'aria-label': 'Status' }, el('option', { value: 'all' }, 'All statuses'),
+      P.byStatus.map(s => el('option', { value: s.name }, s.name)));
+    status.value = pstate.status;
+    const type = el('select', { 'aria-label': 'Type' }, el('option', { value: 'all' }, 'All types'),
+      P.byType.map(s => el('option', { value: s.name }, s.name)));
+    type.value = pstate.type;
+    const rem = el('select', { 'aria-label': 'Remaining' },
+      el('option', { value: 'all' }, 'All projects'), el('option', { value: 'yes' }, 'With credits remaining'));
+    rem.value = pstate.remaining;
+    const sort = el('select', { 'aria-label': 'Sort by' },
+      el('option', { value: 'remaining' }, 'Most remaining'), el('option', { value: 'issued' }, 'Most issued'),
+      el('option', { value: 'listed' }, 'Newest listed'));
+    sort.value = pstate.sort;
+    root.append(el('div', { class: 'controls' },
+      el('label', {}, 'Search', search), el('label', {}, 'Status', status),
+      el('label', {}, 'Type', type), el('label', {}, 'Show', rem), el('label', {}, 'Sort by', sort)));
+    const host = el('div');
+    root.append(host);
+
+    function draw() {
+      const q = pstate.q.trim().toLowerCase();
+      const rows = P.projects.filter(p =>
+        (pstate.status === 'all' || p.status === pstate.status) &&
+        (pstate.type === 'all' || p.type === pstate.type) &&
+        (pstate.remaining === 'all' || p.remaining > 0) &&
+        (!q || (p.id + ' ' + p.name).toLowerCase().includes(q)))
+        .sort((a, z) => pstate.sort === 'issued' ? z.issued - a.issued
+          : pstate.sort === 'listed' ? (z.listed || '').localeCompare(a.listed || '')
+            : z.remaining - a.remaining);
+      host.replaceChildren();
+      if (!rows.length) { host.append(el('p', { class: 'empty' }, 'No matches.')); return; }
+      host.append(el('div', { class: 'scroll' }, el('table', {},
+        el('thead', {}, el('tr', {},
+          el('th', {}, 'Project'), el('th', { class: 'hide-sm' }, 'Status'),
+          el('th', { class: 'num' }, 'Issued'), el('th', { class: 'num hide-sm' }, 'Retired'),
+          el('th', { class: 'num' }, 'Remaining'), el('th', { class: 'hide-sm' }, 'Listed'))),
+        el('tbody', {}, rows.map(p => el('tr', {},
+          el('td', { class: 'name' },
+            p.url ? el('a', { href: p.url, target: '_blank', rel: 'noopener' }, p.id) : p.id,
+            el('span', { class: 'muted' }, ' ' + p.name),
+            p.certifications ? el('span', { class: 'tag' }, p.certifications) : null,
+            p.cancelled ? el('span', { class: 'tag' }, 'cancelled in CarbonPlan: ' + fmt(p.cancelled)) : null),
+          el('td', { class: 'hide-sm muted' }, p.status),
+          el('td', { class: 'num' }, fmt(p.issued)),
+          el('td', { class: 'num hide-sm' }, fmt(p.retired)),
+          el('td', { class: 'num' }, fmt(p.remaining)),
+          el('td', { class: 'hide-sm date' }, p.listed || ''))))),
+        el('p', { class: 'muted' }, `${rows.length} shown`)));
+    }
+    search.addEventListener('input', () => { pstate.q = search.value; draw(); });
+    for (const [s, k] of [[status, 'status'], [type, 'type'], [rem, 'remaining'], [sort, 'sort']])
+      s.addEventListener('change', () => { pstate[k] = s.value; draw(); });
+    draw();
+
+    root.append(el('h2', {}, 'Source'),
+      el('p', { class: 'muted' },
+        'Portfolio data: Pamela Quartson, Barbara K Haya, Tyler Bernard, Aline Abayo, Xinyun Rong, Ivy S So, Micah Elias. (2026). ' +
+        'Voluntary Registry Offsets Database ' + P.version + ', Berkeley Carbon Trading Project, University of California, Berkeley. ' +
+        'https://gspp.berkeley.edu/berkeley-carbon-trading-project/offsets-database. Licensed CC BY 4.0. Projects were selected by "Tradewater" in the project name, developer, owner, operator or designee.'));
+    return root;
+  }
+
   /* ---------- router ---------- */
   function route() {
     const h = location.hash;
     let m, node, section = 'buyers';
-    if ((m = h.match(/^#\/buyer\/(.+)$/))) node = profileView(decodeURIComponent(m[1]));
+    if (h === '#/portfolio') { node = portfolioView(); section = 'portfolio'; }
+    else if ((m = h.match(/^#\/buyer\/(.+)$/))) node = profileView(decodeURIComponent(m[1]));
     else if (h === '#/partners') { node = partnersView(); section = 'partners'; }
     else if ((m = h.match(/^#\/lead\/(.+)$/))) { node = leadView(decodeURIComponent(m[1])); section = 'leads'; }
     else if (h === '#/leads') { node = leadsView(); section = 'leads'; }
     else node = listView();
+    sourceEl.textContent = sourceText(section);
     document.querySelectorAll('nav a').forEach(a =>
       a.getAttribute('data-s') === section ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
     view.replaceChildren(node);
