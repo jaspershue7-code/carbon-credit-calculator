@@ -34,3 +34,7 @@ Double-click `site/index.html`. No server or install needed.
 ## Data terms
 
 Data is from CarbonPlan OffsetsDB (see its terms: https://carbonplan.org/terms). Registries may have their own terms on this data.
+
+## About
+
+My name is Jasper Shue. The REC is super cool.
