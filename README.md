@@ -4,13 +4,16 @@ A static website that shows who retires carbon credits, built from public regist
 
 ## What it does
 
-| Page | What you can do |
+Four tabs. Search is the home page.
+
+| Tab | What you can do |
 |---|---|
-| **Customers** | See every Tradewater credit retired on behalf of a company, how many, and when. Switch between this month, quarter, year and all time. See which intermediaries retired credits and for which customers. |
-| **Companies** | Type a target company's name to see all of its past retirements (Tradewater and other developers) and the intermediaries involved. |
-| **Watchlist** | Save target companies, see all their retirements in one list, and get a "new" flag when retirements appear that were not there at your last visit. |
-| **Competitors** | Type a competing developer's name to see its customers and the intermediaries it works with. |
-| **Data** | The source, its link, the registries, and how old each is. |
+| **Search** | Type a company or a developer name. Companies show every credit retirement on their behalf (Tradewater and other developers) and the intermediaries involved. Developers (competitors) show their customers and intermediaries. |
+| **Customers** | Every Tradewater credit retired on behalf of a company, how many, and when, for this month, quarter, year or all time, plus an intermediaries table. |
+| **Watchlist** | Save target companies with the ☆ next to any company, or paste a list of names. See all their retirements in one table, with a "new" flag for retirements that were not there at your last visit. |
+| **Data** | The source and its link, each registry and its link, and how old each is. |
+
+Every table has a **Download CSV** button.
 
 ## Limits to know
 

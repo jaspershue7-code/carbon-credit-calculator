@@ -1,8 +1,10 @@
-// Five pages: Customers, Companies, Watchlist, Competitors, Data. All numbers come from site/data.js.
+// Four tabs: Search, Customers, Watchlist, Data. Company and developer pages open from search results.
+// All numbers come from site/data.js. The watchlist is saved in this browser (localStorage).
 (function () {
   const D = window.TW_DATA;
   const { fmt, el, btn, today } = window.TWKit;
   const view = document.getElementById('view');
+  const refresh = () => window.TWKit.refresh();
 
   // ---------- shared ----------
   const SUFFIX = /\b(inc|llc|ltd|limited|corp|corporation|co|pbc|the|company)\b/g;   // same cleanup as scripts/build-data.mjs
@@ -15,37 +17,68 @@
   const projLink = pid => D.projectUrls[pid] ? el('a', { href: D.projectUrls[pid], target: '_blank', rel: 'noopener' }, pid) : pid;
   const companyById = id => D.companies.find(c => c.id === id);
   const companyByKey = key => D.companies.find(c => c.key === key);
-  const KIND = { intermediary: 'Intermediary', account: 'Registry account holder' };
+  const KIND = { intermediary: 'Intermediary', account: 'Account holder' };
   const tag = c => (KIND[c.kind] ? el('span', { class: 'tag' }, KIND[c.kind]) : null);
   const daysOld = d => Math.round((Date.parse(today()) - Date.parse(d)) / 86400000);
   const snapshotDate = D.generatedAt.slice(0, 10);
+  const link = (href, text) => el('a', { href }, text);
+  const companyLink = c => link('#/company/' + encodeURIComponent(c.id), c.name);
+  const facts = items => el('ul', { class: 'facts' }, items.map(([v, label]) => el('li', {}, el('b', {}, v), el('span', {}, label))));
+  const hint = (summary, text) => el('details', { class: 'hint' }, el('summary', {}, summary), el('p', {}, text));
+  const section = (title, ...kids) => el('section', {}, el('h2', {}, title), ...kids);
 
-  const search = (value, placeholder, oninput) => {
-    const i = el('input', { type: 'search', placeholder, value, 'aria-label': placeholder });
+  const search = (value, placeholder, oninput, cls = '') => {
+    const i = el('input', { type: 'search', placeholder, value, 'aria-label': placeholder, class: cls, autocomplete: 'off' });
     i.addEventListener('input', () => oninput(i.value));
     return i;
   };
-  const facts = items => el('ul', { class: 'facts' }, items.map(([v, label]) => el('li', {}, el('b', {}, v), el('span', {}, label))));
-  const table = (head, body) => el('div', { class: 'scroll' }, el('table', {},
-    el('thead', {}, el('tr', {}, head.map(([label, cls]) => el('th', { class: cls || '' }, label)))),
-    el('tbody', {}, body)));
-  const link = (href, text) => el('a', { href }, text);
+  // A row of buttons where one is selected
+  const seg = (options, value, onchange) => el('div', { class: 'seg', role: 'group' },
+    options.map(([v, label]) => el('button', { type: 'button', 'aria-pressed': String(v === value), onclick: () => onchange(v) }, label)));
+
+  // ---------- tables with a CSV download ----------
+  function csvOf(t) {
+    const cols = [...t.tHead.rows[0].cells].map((c, i) => (c.textContent.trim() ? i : -1)).filter(i => i >= 0);
+    const cell = td => {
+      const c = td.cloneNode(true);
+      c.querySelectorAll('.tag, button').forEach(n => n.remove());
+      let s = c.textContent.replace(/\s+/g, ' ').trim();
+      if (td.classList.contains('num')) s = s.replace(/,/g, '');
+      return '"' + s.replace(/"/g, '""') + '"';
+    };
+    const out = [cols.map(i => cell(t.tHead.rows[0].cells[i]))];
+    [...t.tBodies[0].rows].forEach(r => out.push(cols.map(i => cell(r.cells[i]))));
+    return out.map(r => r.join(',')).join('\r\n');
+  }
+  function download(name, text) {
+    const url = URL.createObjectURL(new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' }));
+    const a = el('a', { href: url, download: `${name}-${today()}.csv` });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  function table(head, body, name) {
+    const t = el('table', {}, el('thead', {}, el('tr', {}, head.map(([label, cls]) => el('th', { class: cls || '' }, label)))), el('tbody', {}, body));
+    return el('div', { class: 'tablewrap' },
+      el('div', { class: 'tbar' }, el('span', { class: 'muted' }, `${body.length} row${body.length === 1 ? '' : 's'}`),
+        btn('Download CSV', () => download(name, csvOf(t)), 'small')),
+      el('div', { class: 'scroll' }, t));
+  }
 
   // Retirement table. rows: [{ company, t, isNew }]
-  function retirements(rows, { withCompany = false, showNew = false } = {}) {
+  function retirements(rows, name, { withCompany = false, showNew = false } = {}) {
     if (!rows.length) return el('p', { class: 'empty' }, 'No retirements.');
     const head = [['Date'], ...(withCompany ? [['Company']] : []), ['Credits', 'num'], ['Developer'], ['Intermediary', 'hide-sm'], ['Project'], ['Registry note', 'hide-sm']];
     return table(head, rows.map(({ company, t, isNew }) => el('tr', {},
       el('td', { class: 'date' }, t[0] || 'unknown', showNew && isNew ? el('span', { class: 'tag warn' }, 'New') : null),
-      withCompany ? el('td', { class: 'name' }, link('#/company/' + encodeURIComponent(company.id), company.name)) : null,
+      withCompany ? el('td', { class: 'name' }, companyLink(company)) : null,
       el('td', { class: 'num' }, fmt(t[1])),
       el('td', {}, t[4]),
       el('td', { class: 'hide-sm' }, t[5] || '–'),
       el('td', {}, projLink(t[2]), t[3] ? el('span', { class: 'muted' }, ` (vintage ${t[3]})`) : null),
-      el('td', { class: 'hide-sm muted' }, t[6]))));
+      el('td', { class: 'hide-sm muted' }, t[6]))), name);
   }
 
-  // ---------- watchlist storage (this browser only) ----------
+  // ---------- watchlist storage ----------
   const WKEY = 'tradewater-watchlist-v1';
   let wl = { items: [] };
   try { const raw = localStorage.getItem(WKEY); if (raw) wl = JSON.parse(raw); } catch (e) { /* storage blocked: the list lasts until the tab closes */ }
@@ -54,15 +87,16 @@
   const seenMap = c => { const m = {}; (c ? c.tx : []).forEach(t => { const k = txKey(t); m[k] = (m[k] || 0) + 1; }); return m; };
   const isWatched = key => wl.items.some(i => i.key === key);
   function addWatch(name, key) {
-    if (!key || isWatched(key)) return;
+    if (!key || isWatched(key)) return false;
     const c = companyByKey(key);
     wl.items.push({ key, name: c ? c.name : name.trim(), seen: seenMap(c) });
-    saveWl();
+    saveWl(); return true;
   }
   function removeWatch(key) { wl.items = wl.items.filter(i => i.key !== key); saveWl(); }
+  const toggleWatch = (name, key) => { isWatched(key) ? removeWatch(key) : addWatch(name, key); refresh(); };
 
-  // Retirements not seen at the last visit to the Watchlist page. Worked out once per page load, so they stay
-  // highlighted while you look at them and are counted as seen for next time.
+  // Retirements not seen at the last visit to the Watchlist tab. Worked out once per page load, so they stay
+  // highlighted while you look at them and count as seen for next time.
   const newCache = new Map();
   function newIndexes(item) {
     if (!newCache.has(item.key)) {
@@ -74,18 +108,73 @@
   }
   let acknowledged = false;
   const newCount = () => (acknowledged ? 0 : wl.items.reduce((n, i) => n + newIndexes(i).size, 0));
-  function markSeen() {
-    wl.items.forEach(i => { i.seen = seenMap(companyByKey(i.key)); });
-    saveWl(); acknowledged = true;
-  }
-  const watchButton = (name, key) => {
+  function markSeen() { wl.items.forEach(i => { i.seen = seenMap(companyByKey(i.key)); }); saveWl(); acknowledged = true; }
+
+  const star = (name, key) => {
     const on = isWatched(key);
-    return btn(on ? 'Remove from watchlist' : 'Add to watchlist', () => { on ? removeWatch(key) : addWatch(name, key); window.TWKit.refresh(); }, on ? '' : 'primary');
+    return el('button', { type: 'button', class: 'star' + (on ? ' on' : ''), 'aria-pressed': String(on), 'aria-label': (on ? 'Remove ' : 'Add ') + name + (on ? ' from' : ' to') + ' watchlist', title: on ? 'On your watchlist' : 'Add to watchlist', onclick: () => toggleWatch(name, key) }, on ? '★' : '☆');
   };
+  const watchButton = (name, key) => btn(isWatched(key) ? '★ On watchlist (remove)' : '☆ Add to watchlist', () => toggleWatch(name, key), isWatched(key) ? '' : 'primary');
+  // Turns typed names into companies: exact name, then exact cleaned name, then a single partial match
+  function resolve(name) {
+    const lower = name.trim().toLowerCase(), k = nameKey(name);
+    return D.companies.find(c => c.name.toLowerCase() === lower) || companyByKey(k) ||
+      (k.length >= 3 ? (m => (m.length === 1 ? m[0] : null))(D.companies.filter(c => c.key.includes(k))) : null);
+  }
+
+  // ---------- Search (home) ----------
+  const ui = { q: '', period: 'all', cq: '', flash: '' };
+  const companyRow = c => el('tr', {},
+    el('td', { class: 'starcell' }, star(c.name, c.key)),
+    el('td', { class: 'name' }, companyLink(c), tag(c)),
+    el('td', { class: 'num' }, fmt(sum(c.tx))),
+    el('td', { class: 'num hide-sm' }, fmt(sum(c.tx.filter(isTw)))),
+    el('td', { class: 'date' }, latest(c.tx)));
+  const COMPANY_HEAD = [['', 'starcell'], ['Company'], ['Credits retired', 'num'], ['Tradewater credits', 'num hide-sm'], ['Last retired']];
+
+  function searchView() {
+    document.title = 'Tradewater Credit Tracker';
+    const root = el('div');
+    const input = search(ui.q, 'Company or developer name', v => { ui.q = v; draw(); }, 'big');
+    root.append(el('h1', {}, 'Find a company or developer'),
+      el('p', { class: 'sub' }, 'See every carbon credit retirement on a company\'s behalf, who retired it, and which developer sold it.'),
+      input);
+    const host = el('div');
+    root.append(host);
+
+    function draw() {
+      const q = ui.q.trim().toLowerCase(), k = nameKey(ui.q);
+      host.replaceChildren();
+      if (!q) {
+        const top = D.companies.filter(c => c.kind !== 'intermediary').slice(0, 6);
+        const thisYear = D.companies.reduce((n, c) => n + sum(c.tx.filter(t => isTw(t) && c.kind !== 'intermediary' && inPeriod(t[0], 'year'))), 0);
+        host.append(
+          el('p', { class: 'chips' }, el('span', { class: 'muted' }, 'Try: '), top.map(c => el('button', { type: 'button', class: 'chip', onclick: () => { ui.q = c.name; refresh(); } }, c.name))),
+          el('div', { class: 'tiles' },
+            el('a', { class: 'tile', href: '#/customers' }, el('b', {}, 'Customers'), el('span', {}, `${fmt(thisYear)} Tradewater credits retired so far this year`)),
+            el('a', { class: 'tile', href: '#/watchlist' }, el('b', {}, 'Watchlist'), el('span', {}, `${wl.items.length} watched${newCount() ? `, ${newCount()} new retirements` : ''}`)),
+            el('a', { class: 'tile', href: '#/data' }, el('b', {}, 'Data'), el('span', {}, `Snapshot of ${snapshotDate}, ${daysOld(snapshotDate)} days old`))));
+        return;
+      }
+      const cos = D.companies.filter(c => c.name.toLowerCase().includes(q) || (k && c.key.includes(k))).sort((a, z) => z.tx.length - a.tx.length);
+      const devs = D.developers.filter(d => d.name.toLowerCase().includes(q));
+      if (!cos.length && !devs.length) host.append(el('p', { class: 'empty' }, `Nothing found for "${ui.q.trim()}". It may not have retired these credit types, or the registry uses another name.`));
+      if (cos.length) host.append(section(`Companies (${cos.length})`, table(COMPANY_HEAD, cos.slice(0, 15).map(companyRow), 'companies'),
+        cos.length > 15 ? el('p', { class: 'muted' }, 'First 15 shown. Type more to narrow.') : null));
+      if (devs.length) host.append(section(`Developers (${devs.length})`,
+        table([['Developer'], ['Credits retired', 'num'], ['Customers', 'num hide-sm'], ['Last retired']],
+          devs.slice(0, 10).map(d => el('tr', {}, el('td', { class: 'name' }, link('#/developer/' + D.developers.indexOf(d), d.name)),
+            el('td', { class: 'num' }, fmt(d.total)), el('td', { class: 'num hide-sm' }, d.customers.length), el('td', { class: 'date' }, d.last))), 'developers')));
+      if (k && !companyByKey(k)) host.append(el('p', { class: 'actionline' }, btn(`☆ Watch "${ui.q.trim()}" anyway`, () => { addWatch(ui.q, k); location.hash = '#/watchlist'; }),
+        el('span', { class: 'muted' }, ' It shows up on the watchlist if it appears after a data refresh.')));
+    }
+    draw();
+    if (!ui.q) setTimeout(() => input.focus(), 0);
+    return root;
+  }
 
   // ---------- Customers ----------
-  const cstate = { period: 'all', q: '' };
-  const PERIODS = [['all', 'All time'], ['year', 'This year'], ['quarter', 'This quarter'], ['month', 'This month']];
+  const PERIODS = [['month', 'This month'], ['quarter', 'This quarter'], ['year', 'This year'], ['all', 'All time']];
   function inPeriod(date, period) {
     if (period === 'all') return true;
     const now = today();
@@ -97,149 +186,122 @@
 
   function customersView() {
     document.title = 'Customers | Tradewater Credit Tracker';
-    const twRows = [];   // every named Tradewater retirement with its company
+    const twRows = [];
     D.companies.forEach(c => c.tx.filter(isTw).forEach(t => twRows.push({ company: c, t })));
-    const named = D.coverage.beneficiary + D.coverage.account;
+    const lastDate = latest(twRows.map(r => r.t));
 
     const root = el('div');
-    root.append(
-      el('h1', {}, 'Tradewater credits retired for companies'),
-      el('p', { class: 'lede' }, `${fmt(sum(twRows.map(r => r.t)))} Tradewater credits have a company or account holder named in the registry record, out of ${fmt(D.coverage.total)} retired in total.`),
-      el('p', { class: 'note' },
-        `${fmt(D.coverage.unnamed)} credits have no name at all and ${fmt(D.coverage.tradewaterOwn)} were retired from Tradewater's own account, so they are not listed. ` +
-        `The latest retirement in the data is ${latest(twRows.map(r => r.t)) || 'unknown'} (snapshot of ${snapshotDate}), so "this month" is empty until the data catches up.`));
+    root.append(el('h1', {}, 'Customers'),
+      el('p', { class: 'sub' }, 'Companies that Tradewater credits were retired for.'),
+      hint('About this list', `Only credits with a company named in the registry are listed: ${fmt(sum(twRows.map(r => r.t)))} of ${fmt(D.coverage.total)}. ` +
+        `${fmt(D.coverage.unnamed)} have no name and ${fmt(D.coverage.tradewaterOwn)} were retired from Tradewater's own account. ` +
+        `The newest retirement in the data is ${lastDate}, so a period after that date is empty until the data updates.`),
+      facts(['month', 'quarter', 'year', 'all'].map(p => {
+        const rows = twRows.filter(r => inPeriod(r.t[0], p) && r.company.kind !== 'intermediary');
+        return [fmt(sum(rows.map(r => r.t))), `${PERIODS.find(x => x[0] === p)[1]}, ${new Set(rows.map(r => r.company.id)).size} companies`];
+      })));
 
-    root.append(facts(PERIODS.map(([p, label]) => {
-      const rows = twRows.filter(r => inPeriod(r.t[0], p) && r.company.kind !== 'intermediary');
-      return [fmt(sum(rows.map(r => r.t))), `${label} (${new Set(rows.map(r => r.company.id)).size} companies)`];
-    })));
-
-    const period = el('select', { 'aria-label': 'Period' }, PERIODS.map(([v, l]) => el('option', { value: v }, l)));
-    period.value = cstate.period;
-    root.append(el('div', { class: 'controls' },
-      el('label', {}, 'Period', period),
-      el('label', { class: 'grow' }, 'Search', search(cstate.q, 'Company name', v => { cstate.q = v; draw(); }))));
     const host = el('div');
-    root.append(host);
+    root.append(el('div', { class: 'toolbar' }, seg(PERIODS, ui.period, v => { ui.period = v; refresh(); }),
+      search(ui.cq, 'Filter by name', v => { ui.cq = v; draw(); })), host);
 
     function draw() {
-      const q = cstate.q.trim().toLowerCase();
+      const q = ui.cq.trim().toLowerCase();
       const rows = [];
       D.companies.forEach(c => {
         if (c.kind === 'intermediary' || (q && !c.name.toLowerCase().includes(q))) return;
-        const tx = c.tx.filter(t => isTw(t) && inPeriod(t[0], cstate.period));
+        const tx = c.tx.filter(t => isTw(t) && inPeriod(t[0], ui.period));
         if (tx.length) rows.push({ c, tx });
       });
       rows.sort((a, z) => sum(z.tx) - sum(a.tx));
       host.replaceChildren();
-      if (!rows.length) { host.append(el('p', { class: 'empty' }, 'No retirements in this period.')); }
-      else {
-        host.append(
-          table([['Company'], ['Credits', 'num'], ['Retirements', 'num hide-sm'], ['Last retired'], ['Through an intermediary', 'hide-sm']],
-            rows.map(({ c, tx }) => el('tr', {},
-              el('td', { class: 'name' }, link('#/company/' + encodeURIComponent(c.id), c.name), tag(c)),
-              el('td', { class: 'num' }, fmt(sum(tx))),
-              el('td', { class: 'num hide-sm' }, tx.length),
-              el('td', { class: 'date' }, latest(tx)),
-              el('td', { class: 'hide-sm' }, [...new Set(tx.map(t => t[5]).filter(Boolean))].join(', ') || '–')))),
-          el('p', { class: 'muted' }, `${rows.length} companies`));
-      }
-      drawIntermediaries();
+      if (!rows.length) host.append(el('p', { class: 'empty' }, `No retirements in this period${q ? ' for that name' : ''}.` + (ui.period !== 'all' ? ' Try All time.' : '')));
+      else host.append(table([['', 'starcell'], ['Company'], ['Credits', 'num'], ['Retirements', 'num hide-sm'], ['Last retired'], ['Through an intermediary', 'hide-sm']],
+        rows.map(({ c, tx }) => el('tr', {},
+          el('td', { class: 'starcell' }, star(c.name, c.key)),
+          el('td', { class: 'name' }, companyLink(c), tag(c)),
+          el('td', { class: 'num' }, fmt(sum(tx))), el('td', { class: 'num hide-sm' }, tx.length),
+          el('td', { class: 'date' }, latest(tx)),
+          el('td', { class: 'hide-sm' }, [...new Set(tx.map(t => t[5]).filter(Boolean))].join(', ') || '–'))), 'customers'));
+      host.append(intermediaries());
     }
 
-    // Intermediaries: those that retired Tradewater credits themselves, plus those named on a customer's retirement
-    const midHost = el('div');
-    root.append(midHost);
-    function drawIntermediaries() {
+    // Those that retired Tradewater credits themselves, plus those named on a customer's retirement
+    function intermediaries() {
       const mids = new Map();
       const get = (key, name) => { let m = mids.get(key); if (!m) { m = { name, credits: 0, last: '', customers: new Map() }; mids.set(key, m); } return m; };
-      D.companies.forEach(c => c.tx.filter(t => isTw(t) && inPeriod(t[0], cstate.period)).forEach(t => {
+      D.companies.forEach(c => c.tx.filter(t => isTw(t) && inPeriod(t[0], ui.period)).forEach(t => {
         if (c.kind === 'intermediary') { const m = get(c.key, c.name); m.credits += t[1]; if (t[0] > m.last) m.last = t[0]; }
-        if (t[5]) {
-          const m = get(nameKey(t[5]), t[5]); m.credits += t[1]; if (t[0] > m.last) m.last = t[0];
-          m.customers.set(c.id, c.name);
-        }
+        if (t[5]) { const m = get(nameKey(t[5]), t[5]); m.credits += t[1]; if (t[0] > m.last) m.last = t[0]; m.customers.set(c.id, c.name); }
       }));
-      midHost.replaceChildren(el('h2', {}, 'Intermediaries'),
-        el('p', { class: 'note' }, 'Marketplaces, traders and programs that retired Tradewater credits. The registry usually names either the intermediary or the end customer, rarely both, so the customer column is often empty. Intermediary labels are my judgment, listed in scripts/intermediaries.json.'));
-      if (!mids.size) { midHost.append(el('p', { class: 'empty' }, 'No intermediaries in this period.')); return; }
-      midHost.append(table([['Intermediary'], ['Credits', 'num'], ['Last retired'], ['Customers named for']],
-        [...mids.entries()].sort((a, z) => z[1].credits - a[1].credits).map(([key, m]) => {
-          const c = companyByKey(key);
-          return el('tr', {},
-            el('td', { class: 'name' }, c ? link('#/company/' + encodeURIComponent(c.id), m.name) : m.name),
-            el('td', { class: 'num' }, fmt(m.credits)),
-            el('td', { class: 'date' }, m.last),
-            el('td', {}, m.customers.size
-              ? [...m.customers.entries()].map(([id, name], i) => [i ? ', ' : '', link('#/company/' + encodeURIComponent(id), name)])
-              : el('span', { class: 'muted' }, 'none named')));
-        })));
-    }
-    period.addEventListener('change', () => { cstate.period = period.value; draw(); });
-    draw();
-    return root;
-  }
-
-  // ---------- Companies (search any company, see its history) ----------
-  const qstate = { q: '' };
-  function companiesView() {
-    document.title = 'Companies | Tradewater Credit Tracker';
-    const root = el('div');
-    root.append(el('h1', {}, 'Look up a company'),
-      el('p', { class: 'lede' }, `Type the name of a target company to see every credit retirement on its behalf for ${D.types.join(', ')} projects, from Tradewater and from other developers, and which intermediary retired them.`),
-      el('div', { class: 'controls' }, el('label', { class: 'grow' }, 'Company name', search(qstate.q, 'For example Shell', v => { qstate.q = v; draw(); }))));
-    const host = el('div');
-    root.append(host);
-    function draw() {
-      const q = qstate.q.trim().toLowerCase(), k = nameKey(qstate.q);
-      host.replaceChildren();
-      if (!q) { host.append(el('p', { class: 'muted' }, `${D.companies.length} companies in the data. Start typing to search.`)); return; }
-      const rows = D.companies.filter(c => c.name.toLowerCase().includes(q) || (k && c.key.includes(k)))
-        .sort((a, z) => z.tx.length - a.tx.length);
-      if (!rows.length) {
-        host.append(el('p', { class: 'empty' }, `No retirements found for "${qstate.q.trim()}" in this data. Either it has not retired credits of these types, or the registry record uses another name.`));
-      } else {
-        host.append(table([['Company'], ['Retirements', 'num'], ['Credits', 'num'], ['Last retired'], ['Tradewater credits', 'num hide-sm']],
-          rows.slice(0, 50).map(c => el('tr', {},
-            el('td', { class: 'name' }, link('#/company/' + encodeURIComponent(c.id), c.name), tag(c)),
-            el('td', { class: 'num' }, c.tx.length), el('td', { class: 'num' }, fmt(sum(c.tx))),
-            el('td', { class: 'date' }, latest(c.tx)), el('td', { class: 'num hide-sm' }, fmt(sum(c.tx.filter(isTw))))))),
-          el('p', { class: 'muted' }, rows.length > 50 ? 'First 50 of ' + rows.length + ' shown. Type more to narrow.' : rows.length + ' shown'));
-      }
-      if (k && !companyByKey(k)) {
-        host.append(el('p', {}, btn(`Add "${qstate.q.trim()}" to watchlist anyway`, () => { addWatch(qstate.q, k); location.hash = '#/watchlist'; }),
-          el('span', { class: 'muted' }, ' It will show up on the watchlist if it appears after a data refresh.')));
-      }
+      return section('Intermediaries',
+        hint('About intermediaries', 'Marketplaces, traders and programs that retired Tradewater credits. A registry record usually names the intermediary or the end customer, rarely both, so the last column is often empty. The labels are my judgment (scripts/intermediaries.json).'),
+        mids.size ? table([['Intermediary'], ['Credits', 'num'], ['Last retired'], ['Retired for']],
+          [...mids.entries()].sort((a, z) => z[1].credits - a[1].credits).map(([key, m]) => {
+            const c = companyByKey(key);
+            return el('tr', {}, el('td', { class: 'name' }, c ? companyLink(c) : m.name), el('td', { class: 'num' }, fmt(m.credits)), el('td', { class: 'date' }, m.last),
+              el('td', {}, m.customers.size ? [...m.customers.entries()].map(([id, name], i) => [i ? ', ' : '', link('#/company/' + encodeURIComponent(id), name)]) : el('span', { class: 'muted' }, 'none named')));
+          }), 'intermediaries') : el('p', { class: 'empty' }, 'No intermediaries in this period.'));
     }
     draw();
     return root;
   }
 
+  // ---------- Company page ----------
   function companyView(id) {
     const c = companyById(id);
-    if (!c) return el('div', {}, link('#/companies', '← Companies'), el('p', { class: 'empty' }, 'Company not found.'));
+    if (!c) return el('div', {}, link('#/', '← Search'), el('p', { class: 'empty' }, 'Company not found.'));
     document.title = c.name + ' | Tradewater Credit Tracker';
     const tx = c.tx.map(t => ({ company: c, t }));
     const mine = tx.filter(r => isTw(r.t)), others = tx.filter(r => !isTw(r.t));
     const mids = new Map();
     c.tx.forEach(t => { if (t[5]) { const m = mids.get(t[5]) || { credits: 0, last: '' }; m.credits += t[1]; if (t[0] > m.last) m.last = t[0]; mids.set(t[5], m); } });
+    const slug = c.id;
 
     const root = el('div');
-    root.append(link('#/companies', '← Companies'), el('h1', {}, c.name), tag(c) || '',
-      el('p', { class: 'lede' }, `${fmt(sum(c.tx))} credits retired in ${c.tx.length} retirements, ${c.tx[c.tx.length - 1][0]} to ${c.tx[0][0]}.`),
-      el('p', {}, watchButton(c.name, c.key)),
-      facts([[fmt(sum(mine.map(r => r.t))), 'Tradewater credits'], [fmt(sum(others.map(r => r.t))), 'Other developers\' credits'], [latest(c.tx) || 'unknown', 'last retirement']]));
-    root.append(el('h2', {}, 'Intermediaries'));
-    if (mids.size) {
-      root.append(table([['Intermediary'], ['Credits', 'num'], ['Last retired']],
-        [...mids.entries()].sort((a, z) => z[1].credits - a[1].credits).map(([n, m]) => el('tr', {}, el('td', {}, n), el('td', { class: 'num' }, fmt(m.credits)), el('td', { class: 'date' }, m.last)))));
-    } else root.append(el('p', { class: 'empty' }, 'No intermediary is named on this company\'s retirements.'));
-    root.append(el('h2', {}, `Tradewater retirements (${mine.length})`), retirements(mine),
-      el('h2', {}, `Other developers' retirements (${others.length})`), retirements(others));
+    root.append(link('#/', '← Search'),
+      el('div', { class: 'titlerow' }, el('h1', {}, c.name, tag(c)), watchButton(c.name, c.key)),
+      el('p', { class: 'sub' }, `${c.tx.length} retirements, ${c.tx[c.tx.length - 1][0]} to ${c.tx[0][0]}.`),
+      facts([[fmt(sum(c.tx)), 'credits retired'], [fmt(sum(mine.map(r => r.t))), 'Tradewater credits'], [fmt(sum(others.map(r => r.t))), 'other developers\' credits']]));
+    if (mids.size) root.append(section('Intermediaries', table([['Intermediary'], ['Credits', 'num'], ['Last retired']],
+      [...mids.entries()].sort((a, z) => z[1].credits - a[1].credits).map(([n, m]) => el('tr', {}, el('td', {}, n), el('td', { class: 'num' }, fmt(m.credits)), el('td', { class: 'date' }, m.last))), slug + '-intermediaries')));
+    else root.append(section('Intermediaries', el('p', { class: 'empty' }, 'None named on this company\'s retirements.')));
+    root.append(section(`Tradewater retirements (${mine.length})`, retirements(mine, slug + '-tradewater')),
+      section(`Other developers' retirements (${others.length})`, retirements(others, slug + '-other-developers')));
+    return root;
+  }
+
+  // ---------- Developer page ----------
+  function developerView(id) {
+    const d = D.developers[+id];
+    if (!d) return el('div', {}, link('#/', '← Search'), el('p', { class: 'empty' }, 'Developer not found.'));
+    document.title = d.name + ' | Tradewater Credit Tracker';
+    const nameLink = n => { const c = companyByKey(nameKey(n)); return c ? companyLink({ id: c.id, name: n }) : n; };
+    const list = (title, rows, empty, name) => section(`${title} (${rows.length})`, rows.length
+      ? table([['Name'], ['Credits', 'num'], ['Retirements', 'num hide-sm'], ['Last retired']],
+        rows.map(([n, q, count, last]) => el('tr', {}, el('td', { class: 'name' }, nameLink(n)), el('td', { class: 'num' }, fmt(q)), el('td', { class: 'num hide-sm' }, count), el('td', { class: 'date' }, last))), name)
+      : el('p', { class: 'empty' }, empty));
+    const root = el('div');
+    root.append(link('#/', '← Search'), el('h1', {}, d.name),
+      el('p', { class: 'sub' }, `${d.projects} project${d.projects === 1 ? '' : 's'}, ${fmt(d.total)} credits retired for named customers, last on ${d.last}.`),
+      hint('About developer names', 'The registry names a developer for only some projects. Where it is blank, the project name is used with any trailing year or version removed, so one company can appear under more than one name.'),
+      list('Customers', d.customers, 'No named customers.', 'developer-customers'),
+      list('Intermediaries', d.intermediaries, 'No intermediaries found in the registry records.', 'developer-intermediaries'));
     return root;
   }
 
   // ---------- Watchlist ----------
+  function addMany(text) {
+    const names = text.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
+    let added = 0, dupes = 0; const unmatched = [];
+    names.forEach(n => {
+      const c = resolve(n);
+      const ok = c ? addWatch(c.name, c.key) : addWatch(n, nameKey(n));
+      if (ok) { added++; if (!c) unmatched.push(n); } else dupes++;
+    });
+    return names.length ? `Added ${added}${dupes ? `, ${dupes} already on the list` : ''}.` + (unmatched.length ? ` Not in the data yet (watched anyway): ${unmatched.join(', ')}.` : '') : '';
+  }
+
   function watchlistView() {
     document.title = 'Watchlist | Tradewater Credit Tracker';
     const root = el('div');
@@ -250,79 +312,29 @@
     });
     const nNew = all.filter(r => r.isNew).length;
     root.append(el('h1', {}, 'Watchlist'),
-      el('p', { class: 'lede' }, wl.items.length
-        ? `${wl.items.length} companies watched. ${nNew ? nNew + ' new retirement' + (nNew === 1 ? '' : 's') + ' since your last visit.' : 'No new retirements since your last visit.'}`
-        : 'Add the companies Tradewater is targeting. This page shows every retirement on their behalf and flags new ones.'),
-      el('p', { class: 'note' }, `New means a retirement that was not in the data when you last opened this page. The data changes only when CarbonPlan publishes a new snapshot (currently ${snapshotDate}), and a notice appears here and on the nav link only while this site is open. Nothing is emailed. The list is saved in this browser only.`));
+      el('p', { class: 'sub' }, wl.items.length
+        ? `${wl.items.length} watched. ` + (nNew ? `${nNew} new retirement${nNew === 1 ? '' : 's'} since your last visit.` : 'No new retirements since your last visit.')
+        : 'Watch the companies Tradewater is targeting. Use the ☆ next to any company, or paste names below.'),
+      hint('How alerts work', `New means a retirement that was not in the data when you last opened this tab. The data changes only when CarbonPlan publishes a new snapshot (now ${snapshotDate}). The alert shows on the Watchlist tab only while this site is open. Nothing is emailed. The list is saved in this browser only.`));
 
-    const input = el('input', { type: 'text', list: 'company-names', placeholder: 'Company name', 'aria-label': 'Company name' });
-    const dl = el('datalist', { id: 'company-names' }, D.companies.map(c => el('option', { value: c.name })));
-    const add = () => { const v = input.value.trim(); if (!v) return; const k = nameKey(v); const c = D.companies.find(x => x.name.toLowerCase() === v.toLowerCase()) || companyByKey(k); addWatch(v, c ? c.key : k); window.TWKit.refresh(); };
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') add(); });
-    root.append(el('div', { class: 'controls' }, el('label', { class: 'grow' }, 'Add a company', input, dl), el('label', {}, ' ', btn('Add', add, 'primary'))));
+    const box = el('textarea', { rows: 3, placeholder: 'Paste company names, one per line or separated by commas', 'aria-label': 'Company names to watch' });
+    const addBtn = btn('Add to watchlist', () => { ui.flash = addMany(box.value); refresh(); }, 'primary');
+    root.append(el('div', { class: 'pastebox' }, box, addBtn), ui.flash ? el('p', { class: 'flash' }, ui.flash) : null);
+    ui.flash = '';
 
     if (wl.items.length) {
-      root.append(el('h2', {}, 'Companies'),
-        table([['Company'], ['Retirements', 'num'], ['Credits', 'num'], ['Last retired'], ['']],
-          wl.items.map(item => {
-            const c = companyByKey(item.key);
-            return el('tr', {},
-              el('td', { class: 'name' }, c ? link('#/company/' + encodeURIComponent(c.id), c.name) : item.name,
-                newIndexes(item).size ? el('span', { class: 'tag warn' }, newIndexes(item).size + ' new') : null),
-              el('td', { class: 'num' }, c ? c.tx.length : 0), el('td', { class: 'num' }, c ? fmt(sum(c.tx)) : '0'),
-              el('td', { class: 'date' }, c ? latest(c.tx) : 'none in the data'),
-              el('td', { class: 'row-actions' }, btn('Remove', () => { removeWatch(item.key); window.TWKit.refresh(); }, 'small')));
-          })),
-        el('h2', {}, 'All retirements, newest first'),
-        retirements(all.sort((a, z) => z.t[0].localeCompare(a.t[0])), { withCompany: true, showNew: true }));
+      root.append(section('Companies', table([['Company'], ['Retirements', 'num'], ['Credits', 'num'], ['Last retired'], ['']],
+        wl.items.map(item => {
+          const c = companyByKey(item.key), n = newIndexes(item).size;
+          return el('tr', {},
+            el('td', { class: 'name' }, c ? companyLink(c) : item.name, n ? el('span', { class: 'tag warn' }, n + ' new') : null),
+            el('td', { class: 'num' }, c ? c.tx.length : 0), el('td', { class: 'num' }, c ? fmt(sum(c.tx)) : '0'),
+            el('td', { class: 'date' }, c ? latest(c.tx) : 'none in the data'),
+            el('td', { class: 'row-actions' }, btn('Remove', () => { removeWatch(item.key); refresh(); }, 'small')));
+        }), 'watchlist-companies')),
+        section('All retirements, newest first', retirements(all.sort((a, z) => z.t[0].localeCompare(a.t[0])), 'watchlist-retirements', { withCompany: true, showNew: true })));
     }
     markSeen();
-    return root;
-  }
-
-  // ---------- Competitors (other project developers) ----------
-  const dstate = { q: '' };
-  const devId = d => D.developers.indexOf(d);
-  function competitorsView() {
-    document.title = 'Competitors | Tradewater Credit Tracker';
-    const root = el('div');
-    root.append(el('h1', {}, 'Look up a competing developer'),
-      el('p', { class: 'lede' }, `${D.developers.length} other developers have ${D.types.join(', ')} projects in the data. Pick one to see its customers and the intermediaries it works with.`),
-      el('p', { class: 'note' }, 'The registry data has a developer name for only some projects. Where it is blank, the project name is used with any trailing year or version removed, so one company can appear under more than one name (for example Hudson Technologies and "HT").'),
-      el('div', { class: 'controls' }, el('label', { class: 'grow' }, 'Developer name', search(dstate.q, 'For example A-Gas', v => { dstate.q = v; draw(); }))));
-    const host = el('div');
-    root.append(host);
-    function draw() {
-      const q = dstate.q.trim().toLowerCase();
-      const rows = D.developers.filter(d => !q || d.name.toLowerCase().includes(q));
-      host.replaceChildren();
-      if (!rows.length) { host.append(el('p', { class: 'empty' }, 'No developer matches.')); return; }
-      host.append(table([['Developer'], ['Projects', 'num hide-sm'], ['Credits retired', 'num'], ['Customers', 'num hide-sm'], ['Intermediaries', 'num hide-sm'], ['Last retired']],
-        rows.map(d => el('tr', {},
-          el('td', { class: 'name' }, link('#/developer/' + devId(d), d.name)),
-          el('td', { class: 'num hide-sm' }, d.projects), el('td', { class: 'num' }, fmt(d.total)),
-          el('td', { class: 'num hide-sm' }, d.customers.length), el('td', { class: 'num hide-sm' }, d.intermediaries.length),
-          el('td', { class: 'date' }, d.last)))),
-        el('p', { class: 'muted' }, rows.length + ' shown'));
-    }
-    draw();
-    return root;
-  }
-
-  function developerView(id) {
-    const d = D.developers[+id];
-    if (!d) return el('div', {}, link('#/competitors', '← Competitors'), el('p', { class: 'empty' }, 'Developer not found.'));
-    document.title = d.name + ' | Tradewater Credit Tracker';
-    const nameLink = n => { const c = companyByKey(nameKey(n)); return c ? link('#/company/' + encodeURIComponent(c.id), n) : n; };
-    const list = (title, rows, empty) => [el('h2', {}, `${title} (${rows.length})`),
-      rows.length ? table([['Name'], ['Credits', 'num'], ['Retirements', 'num hide-sm'], ['Last retired']],
-        rows.map(([n, q, count, last]) => el('tr', {}, el('td', { class: 'name' }, nameLink(n)), el('td', { class: 'num' }, fmt(q)), el('td', { class: 'num hide-sm' }, count), el('td', { class: 'date' }, last))))
-        : el('p', { class: 'empty' }, empty)];
-    const root = el('div');
-    root.append(link('#/competitors', '← Competitors'), el('h1', {}, d.name),
-      el('p', { class: 'lede' }, `${d.projects} project${d.projects === 1 ? '' : 's'}, ${fmt(d.total)} credits retired for named customers, last on ${d.last}.`),
-      ...list('Customers', d.customers, 'No named customers.'),
-      ...list('Intermediaries', d.intermediaries, 'No intermediaries found in the registry records.'));
     return root;
   }
 
@@ -331,55 +343,49 @@
     document.title = 'Data | Tradewater Credit Tracker';
     const age = daysOld(snapshotDate);
     const root = el('div');
-    root.append(el('h1', {}, 'Where the data comes from'),
-      el('p', { class: 'lede' }, `One source, CarbonPlan OffsetsDB, which collects public records from the carbon credit registries. The snapshot is dated ${snapshotDate}, ${age} days ago.`),
-      el('h2', {}, 'Source'),
-      table([['Source'], ['Link'], ['Snapshot date'], ['Age', 'num']], [el('tr', {},
+    root.append(el('h1', {}, 'Data'),
+      el('p', { class: 'sub' }, `One source, CarbonPlan OffsetsDB, built from public registry records. Snapshot of ${snapshotDate}, ${age} days old.`),
+      section('Source', table([['Source'], ['Link'], ['Snapshot date'], ['Age', 'num']], [el('tr', {},
         el('td', {}, 'CarbonPlan OffsetsDB'),
         el('td', {}, el('a', { href: 'https://carbonplan.org/research/offsets-db', target: '_blank', rel: 'noopener' }, 'carbonplan.org/research/offsets-db'), ' · ', el('a', { href: 'https://carbonplan.org/terms', target: '_blank', rel: 'noopener' }, 'terms')),
-        el('td', { class: 'date' }, snapshotDate), el('td', { class: 'num' }, age + ' days'))]),
-      el('p', { class: 'muted' }, 'A GitHub job checks CarbonPlan every day and rebuilds the site only when CarbonPlan has published a new file. CarbonPlan itself updates when it chooses, so the snapshot can be months old.'),
-      el('h2', {}, 'Registries'),
-      table([['Registry'], ['Link'], ['Projects covered', 'num hide-sm'], ['Retirements used', 'num hide-sm'], ['Latest retirement'], ['Age', 'num']],
-        D.registries.map(r => el('tr', {},
-          el('td', {}, r.name),
+        el('td', { class: 'date' }, snapshotDate), el('td', { class: 'num' }, age + ' days'))], 'source'),
+        hint('How often it updates', 'A GitHub job checks CarbonPlan every day and rebuilds this site only when CarbonPlan has published a new file. CarbonPlan updates when it chooses, so the snapshot can be months old.')),
+      section('Registries', table([['Registry'], ['Link'], ['Projects', 'num hide-sm'], ['Retirements used', 'num hide-sm'], ['Latest retirement'], ['Age', 'num']],
+        D.registries.map(r => el('tr', {}, el('td', {}, r.name),
           el('td', {}, r.url ? el('a', { href: r.url, target: '_blank', rel: 'noopener' }, r.url.replace(/^https?:\/\//, '')) : '–'),
           el('td', { class: 'num hide-sm' }, r.projects), el('td', { class: 'num hide-sm' }, fmt(r.retirements)),
-          el('td', { class: 'date' }, r.latestRetirement), el('td', { class: 'num' }, daysOld(r.latestRetirement) + ' days')))),
-      el('p', { class: 'muted' }, 'Latest retirement is the newest retirement dated in that registry anywhere in the snapshot. It shows how fresh each registry\'s records are. Only the three registries that hold Tradewater-type projects are listed.'),
-      el('h2', {}, 'What is covered'),
-      el('ul', { class: 'plain' },
-        el('li', {}, `Project types: ${D.types.join(', ')}. Retirements on other project types are not in this tool.`),
-        el('li', {}, `${D.projects.length} Tradewater projects, identified by "Tradewater" in the project name or developer, plus the IDs in scripts/extra-tradewater-projects.json.`),
-        el('li', {}, `For each retirement the company is the beneficiary if one is recorded, otherwise the registry account holder. ${fmt(D.coverage.unnamed)} of ${fmt(D.coverage.total)} Tradewater credits (${Math.round(D.coverage.unnamed / D.coverage.total * 100)}%) have neither.`),
-        el('li', {}, 'A retirement is a credit used by a buyer, not a sale by Tradewater.'),
-        el('li', {}, 'Provided as is. Registries may have their own terms on this data.')));
+          el('td', { class: 'date' }, r.latestRetirement), el('td', { class: 'num' }, daysOld(r.latestRetirement) + ' days'))), 'registries'),
+        hint('About registry freshness', 'Latest retirement is the newest retirement dated in that registry anywhere in the snapshot, which shows how current its records are. Only registries that hold Tradewater-type projects are listed.')),
+      section('What is covered', el('ul', { class: 'plain' },
+        el('li', {}, `Project types: ${D.types.join(', ')}. Retirements on other types are not here.`),
+        el('li', {}, `${D.projects.length} Tradewater projects: "Tradewater" in the project name or developer, plus IDs in scripts/extra-tradewater-projects.json.`),
+        el('li', {}, `A retirement's company is the beneficiary if recorded, otherwise the registry account holder. ${Math.round(D.coverage.unnamed / D.coverage.total * 100)}% of Tradewater credits have neither.`),
+        el('li', {}, 'A retirement is a credit used by a buyer, not a sale by Tradewater.'))));
     return root;
   }
 
   // ---------- router ----------
   const PAGES = {
-    '': ['customers', customersView], companies: ['companies', companiesView], company: ['companies', companyView],
-    watchlist: ['watchlist', watchlistView], competitors: ['competitors', competitorsView], developer: ['competitors', developerView],
-    data: ['data', dataView],
+    '': ['search', searchView], company: ['search', companyView], developer: ['search', developerView],
+    customers: ['customers', customersView], watchlist: ['watchlist', watchlistView], data: ['data', dataView],
   };
   function route(keepScroll) {
     const parts = (location.hash || '#/').replace(/^#\/?/, '').split('/');
     let arg = parts.slice(1).join('/');
     try { arg = decodeURIComponent(arg); } catch (e) { /* keep the raw text */ }
-    const [section, fn] = PAGES[parts[0]] || PAGES[''];
+    const [tab, fn] = PAGES[parts[0]] || PAGES[''];
     let node;
     try { node = fn(arg); } catch (err) {
       console.error(err);
-      node = el('div', {}, el('h1', {}, 'Something went wrong'), el('p', { class: 'empty' }, 'This page could not be drawn. Go to Customers and try again.'));
+      node = el('div', {}, el('h1', {}, 'Something went wrong'), el('p', { class: 'empty' }, 'This page could not be drawn. Go to Search and try again.'));
     }
     document.querySelectorAll('header [data-s]').forEach(a => {
-      if (a.getAttribute('data-s') === section) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+      if (a.getAttribute('data-s') === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
     const n = newCount();
     document.querySelector('header [data-s="watchlist"]').textContent = n ? `Watchlist (${n} new)` : 'Watchlist';
-    document.getElementById('source').textContent = `${D.source}, snapshot of ${snapshotDate}`;
-    document.getElementById('foot').textContent = 'Data: CarbonPlan OffsetsDB, from public carbon registry records. Provided as is. A "retirement" is a credit used by a buyer, not a sale by Tradewater. Your watchlist is saved in this browser only.';
+    document.getElementById('source').textContent = `Data: ${D.source}, snapshot of ${snapshotDate}`;
+    document.getElementById('foot').textContent = 'Public registry records, provided as is. A "retirement" is a credit used by a buyer, not a sale by Tradewater. Your watchlist is saved in this browser only.';
     const y = window.scrollY;
     view.replaceChildren(node);
     window.scrollTo(0, keepScroll === true ? y : 0);
