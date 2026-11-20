@@ -118,3 +118,12 @@ td.row-actions { white-space: nowrap; text-align: right; }
 .newsmeta { font-size: 14px; color: var(--muted); margin-top: 2px; }
 .newsmeta .tag:first-of-type { margin-left: 8px; }
 .newswidget .chips { margin-top: 6px; }
+
+/* ai */
+.field { display: grid; gap: 6px; margin-top: 8px; font-weight: 500; }
+.checks { display: grid; gap: 8px; }
+.check { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; background: var(--paper); border: 1px solid var(--rule); border-radius: 8px; padding: 10px 14px; font-size: 16px; }
+.check input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); }
+.check .inline { flex: 1 1 220px; display: flex; }
+.check .inline input, .check .inline select { width: 100%; font: inherit; font-size: 15px; padding: 8px 10px; border: 1px solid #9d9585; border-radius: 6px; background: var(--paper); }
+textarea[readonly] { background: #f0ece4; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }

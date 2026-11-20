@@ -4,7 +4,7 @@ A static website that shows who retires carbon credits, built from public regist
 
 ## What it does
 
-Five tabs. Search is the home page, with an "In the news" summary that opens the News tab.
+Six tabs. Search is the home page, with an "In the news" summary that opens the News tab.
 
 | Tab | What you can do |
 |---|---|
@@ -12,6 +12,7 @@ Five tabs. Search is the home page, with an "In the news" summary that opens the
 | **Customers** | Every Tradewater credit retired on behalf of a company, how many, and when, for this month, quarter, year or all time, plus an intermediaries table. |
 | **Watchlist** | Save target companies with the ☆ next to any company, or paste a list of names. See all their retirements in one table, with a "new" flag for retirements that were not there at your last visit. |
 | **News** | Recent headlines on the carbon credit market, filtered by topic or by headlines that name a company on your watchlist. |
+| **AI** | Type a question. The page packs it with the data you choose (customers, one company's history, competitors, news) into one prompt that tells the AI to use only that data. Copy it into Claude or ChatGPT. There is no key or server, so the answer appears in the AI tool, not on this page. |
 | **Data** | The source and its link, each registry and its link, and how old each is. |
 
 Every table has a **Download CSV** button.
