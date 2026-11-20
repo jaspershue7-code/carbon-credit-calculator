@@ -2,3 +2,9 @@
 # Cloudflare Pages needs the same two settings entered in its dashboard: no build command, output directory "site".
 [build]
   publish = "site"
+
+# The AI tab calls one function (netlify/functions/ask.mjs). It needs these environment variables in Netlify:
+# ANTHROPIC_API_KEY, AI_ACCESS_CODE, and optionally AI_DAILY_LIMIT.
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"

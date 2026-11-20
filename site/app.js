@@ -385,106 +385,109 @@
     return root;
   }
 
-  // ---------- AI (builds a ready-to-paste prompt, no key and no server) ----------
-  const ai = { q: '', company: '', developer: '', ctx: { customers: true, company: false, developers: false, news: false } };
+  // ---------- AI (asks Claude through the /api/ask function, which holds the key) ----------
+  const CODE_KEY = 'tradewater-ai-code';
+  const ai = { q: '', busy: false, turns: [], error: '', needCode: false };   // turns: { q, a, sources }
   const AI_EXAMPLES = [
-    'Which companies retired the most Tradewater credits, and who are the best prospects to contact first?',
+    'Who are the best prospects to contact first, and why?',
     'Which customers buy every year, and which have gone quiet?',
     'Which competitors sell to the same customers as Tradewater?',
-    'Summarize what the market news means for selling HFC and methane credits.',
+    'What does the latest market news mean for selling our credits?',
   ];
   const yearTotals = tx => { const m = {}; tx.forEach(t => { const y = (t[0] || 'unknown').slice(0, 4); m[y] = (m[y] || 0) + t[1]; }); return Object.keys(m).sort().map(y => `${y}: ${fmt(m[y])}`).join('; '); };
+  const readCode = () => { try { return localStorage.getItem(CODE_KEY) || ''; } catch (e) { return ''; } };
+  const saveCode = v => { try { localStorage.setItem(CODE_KEY, v); } catch (e) { /* ignore */ } };
+  const mentioned = (qKey, key) => key.length >= 3 && (' ' + qKey + ' ').includes(' ' + key + ' ');
 
-  function aiContext(opts) {
-    const parts = [];
-    if (opts.customers) {
-      const rows = D.companies.filter(c => c.kind !== 'intermediary')
-        .map(c => ({ c, tx: c.tx.filter(isTw) })).filter(r => r.tx.length).sort((a, z) => sum(z.tx) - sum(a.tx));
-      parts.push('## Tradewater customers (companies named on Tradewater credit retirements)\n' +
-        'company | kind | Tradewater credits | retirements | first | last | credits by year | intermediaries named\n' +
-        rows.map(({ c, tx }) => [c.name, c.kind, sum(tx), tx.length, tx[tx.length - 1][0], tx[0][0], yearTotals(tx), [...new Set(tx.map(t => t[5]).filter(Boolean))].join(', ') || 'none'].join(' | ')).join('\n') +
-        `\nCoverage: ${D.coverage.unnamed} of ${D.coverage.total} Tradewater credits have no company named and ${D.coverage.tradewaterOwn} were retired from Tradewater's own account, so they are not above.`);
-      const mids = D.companies.filter(c => c.kind === 'intermediary').map(c => [c.name, sum(c.tx.filter(isTw)), latest(c.tx.filter(isTw))]).filter(m => m[1]);
-      if (mids.length) parts.push('## Intermediaries that retired Tradewater credits\nname | Tradewater credits | last\n' + mids.sort((a, z) => z[1] - a[1]).map(m => m.join(' | ')).join('\n'));
-    }
-    if (opts.company) {
-      const c = resolve(opts.company);
-      parts.push(c
-        ? `## Every recorded retirement for ${c.name}\ndate | credits | project | vintage | developer | intermediary | registry note\n` + c.tx.map(t => [t[0], t[1], t[2], t[3], t[4], t[5] || 'none', t[6]].join(' | ')).join('\n')
-        : `## ${opts.company}\nNo retirements for this name are in the data.`);
-    }
-    if (opts.developers) {
-      const list = opts.developer ? D.developers.filter(d => d.name === opts.developer) : D.developers.slice(0, 15);
-      parts.push('## Competing project developers' + (opts.developer ? '' : ' (top 15 by credits retired)') + '\n' +
+  // Picks the data that fits the question. Returns { text, sources } where sources says what was sent.
+  function aiContext(question) {
+    const qKey = nameKey(question), lower = question.toLowerCase();
+    const parts = [`Today is ${today()}. The registry data is a snapshot of ${snapshotDate}.`], sources = [];
+    const rows = D.companies.filter(c => c.kind !== 'intermediary').map(c => ({ c, tx: c.tx.filter(isTw) })).filter(r => r.tx.length).sort((a, z) => sum(z.tx) - sum(a.tx));
+    parts.push('## Tradewater customers (companies named on Tradewater credit retirements)\ncompany | kind | Tradewater credits | retirements | first | last | credits by year | intermediaries named\n' +
+      rows.map(({ c, tx }) => [c.name, c.kind, sum(tx), tx.length, tx[tx.length - 1][0], tx[0][0], yearTotals(tx), [...new Set(tx.map(t => t[5]).filter(Boolean))].join(', ') || 'none'].join(' | ')).join('\n') +
+      `\nCoverage: ${D.coverage.unnamed} of ${D.coverage.total} Tradewater credits have no company named and ${D.coverage.tradewaterOwn} were retired from Tradewater's own account, so they are not listed.`);
+    const mids = D.companies.filter(c => c.kind === 'intermediary').map(c => [c.name, sum(c.tx.filter(isTw)), latest(c.tx.filter(isTw))]).filter(m => m[1]);
+    if (mids.length) parts.push('## Intermediaries that retired Tradewater credits\nname | Tradewater credits | last\n' + mids.sort((a, z) => z[1] - a[1]).map(m => m.join(' | ')).join('\n'));
+    sources.push('Tradewater customers and intermediaries');
+
+    D.companies.filter(c => mentioned(qKey, c.key)).slice(0, 3).forEach(c => {
+      parts.push(`## Every recorded retirement for ${c.name}\ndate | credits | project | vintage | developer | intermediary | registry note\n` + c.tx.slice(0, 150).map(t => [t[0], t[1], t[2], t[3], t[4], t[5] || 'none', t[6]].join(' | ')).join('\n'));
+      sources.push(`${c.name}'s retirements`);
+    });
+    const named = D.developers.filter(d => mentioned(qKey, nameKey(d.name)));
+    const wantDevs = named.length || /competitor|developer|rival|a-gas|compete|sell to the same/.test(lower);
+    if (wantDevs) {
+      const list = named.length ? named.slice(0, 3) : D.developers.slice(0, 15);
+      parts.push('## Competing project developers' + (named.length ? '' : ' (top 15 by credits retired)') + '\n' +
         list.map(d => `${d.name}: ${d.projects} projects, ${d.total} credits retired, last ${d.last}\n  customers: ${d.customers.slice(0, 15).map(r => `${r[0]} (${r[1]})`).join('; ') || 'none'}\n  intermediaries: ${d.intermediaries.slice(0, 10).map(r => `${r[0]} (${r[1]})`).join('; ') || 'none'}`).join('\n'));
+      sources.push(named.length ? named.slice(0, 3).map(d => d.name).join(', ') + ' (competitor data)' : 'Top competing developers');
     }
-    if (opts.news) {
-      parts.push('## Recent carbon credit market headlines (headlines only, not full articles)\ndate | publisher | headline | topics\n' +
-        (NEWS.items.slice(0, 40).map(i => [i.date, i.source, i.title, i.topics.join(', ')].join(' | ')).join('\n') || 'No headlines saved.'));
+    if (NEWS.items.length && /news|market|price|trend|headline|policy|regulat|demand|outlook|corsia|article 6|compliance|cap-and-trade|eu |uk /.test(lower)) {
+      parts.push('## Recent carbon credit market headlines (headlines only, not full articles)\ndate | publisher | headline | topics\n' + NEWS.items.slice(0, 40).map(i => [i.date, i.source, i.title, i.topics.join(', ')].join(' | ')).join('\n'));
+      sources.push('Recent market headlines');
     }
-    return parts;
+    return { text: parts.join('\n\n'), sources };
   }
 
-  function buildPrompt(opts) {
-    const head = 'You are helping a salesperson at Tradewater, a company that sells carbon credits from refrigerant, ozone-depleting substance and methane projects. ' +
-      `Answer the question using ONLY the data below. Today is ${today()}. The registry data is a snapshot of ${snapshotDate}, so say so if recency matters. ` +
-      'If the data does not contain the answer, say exactly what is missing instead of guessing. Do not invent companies, numbers, dates or sources. ' +
-      'A retirement means a credit was used by a buyer, not that Tradewater sold it. Keep the answer short and practical, and quote the names and numbers you rely on.';
-    const ctx = aiContext(opts);
-    return [head, ctx.length ? '# DATA\n' + ctx.join('\n\n') : '# DATA\n(none selected)', '# QUESTION\n' + (opts.q.trim() || '(type your question above)')].join('\n\n');
-  }
-
-  async function copyText(text) {
-    try { await navigator.clipboard.writeText(text); return true; } catch (e) {
-      const t = el('textarea', { style: 'position:fixed;opacity:0' }); t.value = text; document.body.append(t); t.select();
-      let ok = false; try { ok = document.execCommand('copy'); } catch (err) { /* ignore */ } t.remove(); return ok;
+  async function askAI(question) {
+    const code = readCode();
+    const { text, sources } = aiContext(question);
+    const history = ai.turns.slice(-3).map(t => ({ q: t.q, a: t.a }));
+    let res;
+    try {
+      res = await fetch('/api/ask', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code, question, context: text, history }) });
+    } catch (e) {
+      return { error: 'Could not reach the AI. It only works on the live site, not from a file on your computer, and needs an internet connection.' };
     }
+    let data = {};
+    try { data = await res.json(); } catch (e) { /* not JSON, handled below */ }
+    if (res.status === 401) return { needCode: true, error: data.error || 'Enter the access code.' };
+    if (res.status === 404) return { error: 'The AI is not part of this version of the site yet. It needs the Netlify function deployed.' };
+    if (!res.ok || !data.answer) return { error: data.error || `The AI request failed (${res.status}). If the answer takes more than about ten seconds, the host may be cutting it off. Try a shorter question.` };
+    return { answer: data.answer, sources, truncated: data.truncated, refused: data.refused };
   }
 
   function aiView() {
     document.title = 'AI | Tradewater Credit Tracker';
     const root = el('div');
     root.append(el('h1', {}, 'Ask AI'),
-      el('p', { class: 'sub' }, 'Type a question. This page packs it with the right data into one prompt. Copy it into Claude or ChatGPT to get the answer.'),
-      hint('Why copy and paste?', 'This site is plain files with no server, so it cannot hold an AI key safely. The prompt is built in your browser, nothing is sent anywhere until you paste it into an AI yourself. The prompt tells the AI to use only this data and to say when the answer is missing, but check what it tells you against the tables.'));
+      el('p', { class: 'sub' }, 'Ask about customers, prospects, competitors or the market. It answers from this site\'s data.'),
+      hint('How it works', 'Your question and the matching data (customers, any company or developer you name, and headlines when you ask about the market) go to Claude through a small server function. The answer is based only on that data, and it should say when the data cannot answer. Check what it tells you against the tables, especially numbers. Nothing is stored except a count of questions per day.'));
 
-    const q = el('textarea', { rows: 3, placeholder: 'For example: which customers have gone quiet this year?', 'aria-label': 'Your question' });
+    const q = el('textarea', { rows: 3, placeholder: 'For example: which customers have gone quiet this year?', 'aria-label': 'Your question', disabled: ai.busy || null });
     q.value = ai.q;
-    const company = el('input', { type: 'search', list: 'ai-companies', placeholder: 'Company name', 'aria-label': 'Company to include', value: ai.company, autocomplete: 'off' });
-    const dev = el('select', { 'aria-label': 'Developer to include' }, el('option', { value: '' }, 'Top 15 developers'), D.developers.map(d => el('option', { value: d.name }, d.name)));
-    dev.value = ai.developer;
-    const boxes = {};
-    const check = (key, label, extra) => el('label', { class: 'check' }, boxes[key] = el('input', { type: 'checkbox', checked: ai.ctx[key] || null, onchange: e => { ai.ctx[key] = e.target.checked; update(); } }), label, extra || null);
-    const out = el('textarea', { rows: 14, readonly: true, 'aria-label': 'Prompt to copy' });
-    const size = el('span', { class: 'muted' });
-    const status = el('span', { class: 'muted' });
-    const state = () => ({ q: ai.q, company: ai.ctx.company ? ai.company : '', developer: ai.developer, customers: ai.ctx.customers, developers: ai.ctx.developers, news: ai.ctx.news });
-    function update() {
-      const p = buildPrompt(state());
-      out.value = p;
-      size.textContent = `${p.length.toLocaleString('en-US')} characters` + (p.length > 60000 ? '. Long: some AI tools may cut it off, so turn off a data source.' : '');
-      status.textContent = '';
+    q.addEventListener('input', () => { ai.q = q.value; });
+    q.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) go(); });
+    const code = el('input', { type: 'password', placeholder: 'Access code', 'aria-label': 'Access code', value: readCode(), autocomplete: 'off' });
+    code.addEventListener('change', () => saveCode(code.value.trim()));
+
+    async function go() {
+      const question = ai.q.trim();
+      if (!question || ai.busy) return;
+      saveCode(code.value.trim());
+      ai.busy = true; ai.error = ''; ai.needCode = false; refresh();
+      const r = await askAI(question);
+      ai.busy = false;
+      if (r.answer) { ai.turns.push({ q: question, a: r.answer, sources: r.sources, truncated: r.truncated, refused: r.refused }); ai.q = ''; }
+      else { ai.error = r.error; ai.needCode = !!r.needCode; }
+      refresh();
     }
-    q.addEventListener('input', () => { ai.q = q.value; update(); });
-    company.addEventListener('input', () => { ai.company = company.value; if (company.value.trim() && !ai.ctx.company) { ai.ctx.company = true; boxes.company.checked = true; } update(); });
-    dev.addEventListener('change', () => { ai.developer = dev.value; if (dev.value) { ai.ctx.developers = true; boxes.developers.checked = true; } update(); });
 
     root.append(
       el('label', { class: 'field' }, el('span', {}, 'Your question'), q),
-      el('p', { class: 'chips' }, el('span', { class: 'muted' }, 'Try: '), AI_EXAMPLES.map(x => el('button', { type: 'button', class: 'chip', onclick: () => { ai.q = x; refresh(); } }, x))),
-      section('Data to include',
-        el('div', { class: 'checks' },
-          check('customers', 'Tradewater customers and intermediaries'),
-          check('company', 'One company\'s full history', el('span', { class: 'inline' }, company, el('datalist', { id: 'ai-companies' }, D.companies.map(c => el('option', { value: c.name }))))),
-          check('developers', 'Competing developers', el('span', { class: 'inline' }, dev)),
-          check('news', 'Recent market headlines (needs the News tab data)'))),
-      section('Your prompt', out,
-        el('div', { class: 'toolbar' },
-          btn('Copy prompt', async () => { status.textContent = (await copyText(out.value)) ? 'Copied. Paste it into the AI.' : 'Copy failed. Select the text and copy it yourself.'; }, 'primary'),
-          el('a', { class: 'btn', href: 'https://claude.ai/new', target: '_blank', rel: 'noopener' }, 'Open Claude'),
-          el('a', { class: 'btn', href: 'https://chatgpt.com/', target: '_blank', rel: 'noopener' }, 'Open ChatGPT'),
-          size, status)));
-    update();
+      el('div', { class: 'toolbar' },
+        btn(ai.busy ? 'Thinking…' : 'Ask', go, 'primary'),
+        readCode() && !ai.needCode ? null : el('label', { class: 'inlinelabel' }, 'Access code', code),
+        ai.turns.length ? btn('Start over', () => { ai.turns = []; ai.error = ''; refresh(); }, 'small') : null),
+      ai.error ? el('p', { class: 'flash' }, ai.error) : null,
+      ai.turns.length ? null : el('p', { class: 'chips' }, el('span', { class: 'muted' }, 'Try: '), AI_EXAMPLES.map(x => el('button', { type: 'button', class: 'chip', onclick: () => { ai.q = x; refresh(); } }, x))));
+
+    [...ai.turns].reverse().forEach(t => root.append(el('section', { class: 'answer' },
+      el('p', { class: 'asked' }, t.q),
+      el('div', { class: 'answertext' }, t.a),
+      t.truncated ? el('p', { class: 'muted' }, 'The answer was cut off. Ask a narrower question.') : null,
+      el('p', { class: 'muted' }, 'Based on: ' + t.sources.join('; ') + '. AI can make mistakes, so check numbers against the tables.'))));
     return root;
   }
 

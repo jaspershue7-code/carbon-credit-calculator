@@ -12,7 +12,7 @@ Six tabs. Search is the home page, with an "In the news" summary that opens the 
 | **Customers** | Every Tradewater credit retired on behalf of a company, how many, and when, for this month, quarter, year or all time, plus an intermediaries table. |
 | **Watchlist** | Save target companies with the ☆ next to any company, or paste a list of names. See all their retirements in one table, with a "new" flag for retirements that were not there at your last visit. |
 | **News** | Recent headlines on the carbon credit market, filtered by topic or by headlines that name a company on your watchlist. |
-| **AI** | Type a question. The page packs it with the data you choose (customers, one company's history, competitors, news) into one prompt that tells the AI to use only that data. Copy it into Claude or ChatGPT. There is no key or server, so the answer appears in the AI tool, not on this page. |
+| **AI** | Ask a question in plain words. The page picks the matching data (customers, any company or developer you name, headlines for market questions), sends it to Claude through a server function, and shows the answer with what it was based on. Needs the setup below. |
 | **Data** | The source and its link, each registry and its link, and how old each is. |
 
 Every table has a **Download CSV** button.
@@ -20,6 +20,16 @@ Every table has a **Download CSV** button.
 ## News
 
 `scripts/refresh-news.mjs` runs in the daily GitHub job and writes `site/news.js` from Google News RSS searches (topics and search terms are at the top of the script). It keeps only the headline, publisher, date and link. Google states its RSS feeds are for personal, non-commercial feed-reader use, so check that this fits how Tradewater will use the tool before sharing it widely. Watchlist matching is a whole-word name match, so a short or common name can match the wrong company. If the news step fails, the job still finishes and the old headlines stay.
+
+## AI setup (Netlify)
+
+The AI tab calls `netlify/functions/ask.mjs`, which keeps the Anthropic API key off the web page. In Netlify, open Site configuration > Environment variables and add:
+
+- `ANTHROPIC_API_KEY`: a key from console.anthropic.com. You create it and paste it in Netlify yourself. Never put it in the repo.
+- `AI_ACCESS_CODE`: a code you choose. Users enter it once per browser. Without it the function refuses every request.
+- `AI_DAILY_LIMIT` (optional): questions allowed per day across everyone, default 100. The function stops at the limit and fails closed if it cannot count.
+
+Then redeploy. The model is Claude Sonnet 5.5 (`MODEL` in the function). Every question costs API money, so keep the code private and the limit low. Netlify may cut off a function that runs longer than about 10 seconds on some plans, and the page says so if an answer fails that way. The AI tab does nothing when the site is opened as a file on your computer, because the function only exists on Netlify.
 
 ## Limits to know
 

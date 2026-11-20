@@ -121,9 +121,9 @@ td.row-actions { white-space: nowrap; text-align: right; }
 
 /* ai */
 .field { display: grid; gap: 6px; margin-top: 8px; font-weight: 500; }
-.checks { display: grid; gap: 8px; }
-.check { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; background: var(--paper); border: 1px solid var(--rule); border-radius: 8px; padding: 10px 14px; font-size: 16px; }
-.check input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); }
-.check .inline { flex: 1 1 220px; display: flex; }
-.check .inline input, .check .inline select { width: 100%; font: inherit; font-size: 15px; padding: 8px 10px; border: 1px solid #9d9585; border-radius: 6px; background: var(--paper); }
-textarea[readonly] { background: #f0ece4; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+.inlinelabel { display: flex; align-items: center; gap: 8px; font-size: 15px; color: var(--muted); }
+.inlinelabel input { font: inherit; font-size: 16px; padding: 9px 12px; border: 1px solid #9d9585; border-radius: 8px; background: var(--paper); width: 160px; }
+.answer { background: var(--paper); border: 1px solid var(--rule); border-radius: 10px; padding: 6px 18px 14px; margin-top: 18px; }
+.asked { font-weight: 600; margin: 12px 0 8px; }
+.answertext { white-space: pre-wrap; line-height: 1.6; }
+textarea:disabled { opacity: 0.6; }
