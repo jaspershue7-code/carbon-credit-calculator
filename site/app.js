@@ -1,4 +1,4 @@
-// Four tabs: Search, Customers, Watchlist, Data. Company and developer pages open from search results.
+// Five tabs: Search, Customers, Watchlist, News, Data. Company and developer pages open from search results.
 // All numbers come from site/data.js. The watchlist is saved in this browser (localStorage).
 (function () {
   const D = window.TW_DATA;
@@ -123,7 +123,53 @@
   }
 
   // ---------- Search (home) ----------
-  const ui = { q: '', period: 'all', cq: '', flash: '' };
+  const ui = { q: '', period: 'all', cq: '', flash: '', newsTopic: 'all' };
+
+  // ---------- news (site/news.js, rebuilt daily by scripts/refresh-news.mjs) ----------
+  const NEWS = window.TW_NEWS || { updatedAt: '', topics: [], items: [] };
+  // Watchlist companies named in a headline (whole-word match on the cleaned name)
+  const mentions = item => {
+    const t = ' ' + nameKey(item.title) + ' ';
+    return wl.items.filter(w => w.key.length >= 4 && t.includes(' ' + w.key + ' ')).map(w => w.name);
+  };
+  const newsLine = (item, withTopics) => {
+    const who = mentions(item);
+    return el('li', { class: 'newsitem' },
+      el('a', { href: item.link, target: '_blank', rel: 'noopener' }, item.title),
+      el('div', { class: 'newsmeta' }, [item.source, item.date].filter(Boolean).join(' · '),
+        who.map(n => el('span', { class: 'tag warn' }, '★ ' + n)),
+        withTopics ? item.topics.map(t => el('span', { class: 'tag' }, t)) : null));
+  };
+  // The quick summary on the home page: latest three headlines and a count per topic
+  function newsWidget() {
+    if (!NEWS.items.length) return null;
+    const watched = NEWS.items.filter(i => mentions(i).length).length;
+    const go = topic => { ui.newsTopic = topic; location.hash = '#/news'; };
+    return el('section', { class: 'newswidget' },
+      el('div', { class: 'widgethead' }, el('h2', {}, 'In the news'), link('#/news', 'See all news →')),
+      el('ul', { class: 'newslist' }, NEWS.items.slice(0, 3).map(i => newsLine(i, false))),
+      el('p', { class: 'chips' },
+        NEWS.topics.map(t => el('button', { type: 'button', class: 'chip', onclick: () => go(t) }, `${t} (${NEWS.items.filter(i => i.topics.includes(t)).length})`)),
+        wl.items.length ? el('button', { type: 'button', class: 'chip', onclick: () => go('watchlist') }, `★ Mentions your watchlist (${watched})`) : null));
+  }
+
+  function newsView() {
+    document.title = 'News | Tradewater Credit Tracker';
+    const root = el('div');
+    const topic = NEWS.topics.includes(ui.newsTopic) || ui.newsTopic === 'watchlist' ? ui.newsTopic : 'all';
+    const rows = NEWS.items.filter(i => topic === 'all' || (topic === 'watchlist' ? mentions(i).length : i.topics.includes(topic)));
+    const watched = NEWS.items.filter(i => mentions(i).length).length;
+    root.append(el('h1', {}, 'News'),
+      el('p', { class: 'sub' }, NEWS.updatedAt ? `Headlines on the carbon credit market. Updated ${NEWS.updatedAt.slice(0, 10)}.` : 'No headlines saved yet.'),
+      hint('Where the headlines come from', 'Google News searches on the topics below, refreshed once a day by a GitHub job. Only the headline, publisher, date and link are kept, and links open the publisher\'s page. Search terms are in scripts/refresh-news.mjs. A ★ tag means the headline names a company on your watchlist (a name match, so check it).'));
+    if (!NEWS.items.length) return root;
+    root.append(el('div', { class: 'toolbar' }, el('div', { class: 'seg' },
+      [['all', `All (${NEWS.items.length})`], ...NEWS.topics.map(t => [t, `${t} (${NEWS.items.filter(i => i.topics.includes(t)).length})`]), ['watchlist', `★ Watchlist (${watched})`]]
+        .map(([v, label]) => el('button', { type: 'button', 'aria-pressed': String(v === topic), onclick: () => { ui.newsTopic = v; refresh(); } }, label)))),
+      rows.length ? el('ul', { class: 'newslist' }, rows.map(i => newsLine(i, true)))
+        : el('p', { class: 'empty' }, topic === 'watchlist' ? (wl.items.length ? 'No recent headlines name a company on your watchlist.' : 'Your watchlist is empty. Add companies with the ☆ to see headlines that mention them.') : 'No headlines.'));
+    return root;
+  }
   const companyRow = c => el('tr', {},
     el('td', { class: 'starcell' }, star(c.name, c.key)),
     el('td', { class: 'name' }, companyLink(c), tag(c)),
@@ -153,7 +199,8 @@
           el('div', { class: 'tiles' },
             el('a', { class: 'tile', href: '#/customers' }, el('b', {}, 'Customers'), el('span', {}, `${fmt(thisYear)} Tradewater credits retired so far this year`)),
             el('a', { class: 'tile', href: '#/watchlist' }, el('b', {}, 'Watchlist'), el('span', {}, `${wl.items.length} watched${newCount() ? `, ${newCount()} new retirements` : ''}`)),
-            el('a', { class: 'tile', href: '#/data' }, el('b', {}, 'Data'), el('span', {}, `Snapshot of ${snapshotDate}, ${daysOld(snapshotDate)} days old`))));
+            el('a', { class: 'tile', href: '#/data' }, el('b', {}, 'Data'), el('span', {}, `Snapshot of ${snapshotDate}, ${daysOld(snapshotDate)} days old`))),
+          newsWidget());
         return;
       }
       const cos = D.companies.filter(c => c.name.toLowerCase().includes(q) || (k && c.key.includes(k))).sort((a, z) => z.tx.length - a.tx.length);
@@ -367,7 +414,7 @@
   // ---------- router ----------
   const PAGES = {
     '': ['search', searchView], company: ['search', companyView], developer: ['search', developerView],
-    customers: ['customers', customersView], watchlist: ['watchlist', watchlistView], data: ['data', dataView],
+    customers: ['customers', customersView], watchlist: ['watchlist', watchlistView], news: ['news', newsView], data: ['data', dataView],
   };
   function route(keepScroll) {
     const parts = (location.hash || '#/').replace(/^#\/?/, '').split('/');

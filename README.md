@@ -4,16 +4,21 @@ A static website that shows who retires carbon credits, built from public regist
 
 ## What it does
 
-Four tabs. Search is the home page.
+Five tabs. Search is the home page, with an "In the news" summary that opens the News tab.
 
 | Tab | What you can do |
 |---|---|
 | **Search** | Type a company or a developer name. Companies show every credit retirement on their behalf (Tradewater and other developers) and the intermediaries involved. Developers (competitors) show their customers and intermediaries. |
 | **Customers** | Every Tradewater credit retired on behalf of a company, how many, and when, for this month, quarter, year or all time, plus an intermediaries table. |
 | **Watchlist** | Save target companies with the ☆ next to any company, or paste a list of names. See all their retirements in one table, with a "new" flag for retirements that were not there at your last visit. |
+| **News** | Recent headlines on the carbon credit market, filtered by topic or by headlines that name a company on your watchlist. |
 | **Data** | The source and its link, each registry and its link, and how old each is. |
 
 Every table has a **Download CSV** button.
+
+## News
+
+`scripts/refresh-news.mjs` runs in the daily GitHub job and writes `site/news.js` from Google News RSS searches (topics and search terms are at the top of the script). It keeps only the headline, publisher, date and link. Google states its RSS feeds are for personal, non-commercial feed-reader use, so check that this fits how Tradewater will use the tool before sharing it widely. Watchlist matching is a whole-word name match, so a short or common name can match the wrong company. If the news step fails, the job still finishes and the old headlines stay.
 
 ## Limits to know
 

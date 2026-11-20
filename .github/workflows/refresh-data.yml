@@ -1,6 +1,6 @@
 name: Refresh registry data
 
-# Checks CarbonPlan and Berkeley once a day. If either has new data, it rebuilds site/data.js and
+# Checks CarbonPlan and Berkeley once a day, and refreshes the news headlines. If either has new data, it rebuilds site/data.js and
 # site/portfolio.js and saves a commit, which then redeploys the site. If nothing changed, it does nothing.
 # If a rebuild fails its checks, the old files are kept and this job shows as failed.
 on:
@@ -28,6 +28,10 @@ jobs:
 
       - name: Check for new data and rebuild
         run: node scripts/refresh-data.mjs
+
+      - name: Refresh market news headlines
+        continue-on-error: true
+        run: node scripts/refresh-news.mjs
 
       - name: Save changes
         run: |
