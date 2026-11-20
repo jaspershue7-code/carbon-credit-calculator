@@ -1,4 +1,4 @@
-// Builds site/news.js: recent headlines from Google News RSS searches, grouped by topic.
+// Builds site/news.js: recent carbon credit market headlines from Google News RSS searches, grouped by topic.
 // Only the headline, link, publisher and date are kept, never article text. Run: node scripts/refresh-news.mjs
 // If every search fails, the old file is kept and the script exits with an error.
 import fs from 'node:fs';
@@ -7,15 +7,15 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(here, '..', 'site', 'news.js');
-const DAYS = 60, MAX_ITEMS = 150;
+const DAYS = 60, MAX_ITEMS = 250;
 
 // Topic name -> search queries. Edit these to change what the News tab follows.
 const TOPICS = {
-  'Carbon credit market': ['"voluntary carbon market"', '"carbon credits" price OR demand OR retirement'],
-  'Refrigerants and HFCs': ['"HFC" refrigerant reclamation carbon', '"refrigerant" "carbon credits"', 'AIM Act HFC phasedown'],
-  'Methane and oil & gas wells': ['orphan well plugging carbon credits', 'methane abatement carbon credits oil gas wells'],
-  'Ozone-depleting substances': ['ozone-depleting substances carbon offsets', 'ODS destruction carbon credits'],
-  'Buyers and policy': ['corporate carbon credit purchase retire', 'CARB OR "Washington Ecology" carbon offsets compliance'],
+  'Prices and demand': ['"carbon credit prices"', '"voluntary carbon market" prices OR demand OR volumes', '"carbon credit" retirements record OR growth OR decline'],
+  'Market news': ['"carbon market" (credits OR offsets OR emissions OR trading)', '"carbon credits" market outlook', 'carbon credit buyers corporate purchase'],
+  'Compliance markets': ['California cap-and-trade carbon allowances OR offsets', 'EU ETS carbon price', 'CORSIA carbon credits airlines'],
+  'Standards and integrity': ['ICVCM Core Carbon Principles', 'Verra OR "Gold Standard" OR "American Carbon Registry" carbon credits', '"Article 6" carbon markets'],
+  'Credit types Tradewater sells': ['HFC refrigerant carbon credits', 'ozone-depleting substances carbon credits', 'orphan well plugging methane carbon credits'],
 };
 
 const decode = s => s
