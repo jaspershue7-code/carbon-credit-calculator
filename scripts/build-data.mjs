@@ -1,4 +1,4 @@
-// Builds site/data.js from CarbonPlan OffsetsDB CSV files.
+// Builds site/data.js from CarbonPlan OffsetsDB CSV files: every named retirement on Tradewater-type projects, other developers, registries.
 // Usage: node scripts/build-data.mjs <folder with projects.csv, credits.csv, metadata.json>
 import fs from 'node:fs';
 import path from 'node:path';
@@ -70,138 +70,141 @@ function nameKey(name) {
     .replace(/\s+/g, ' ').trim();
 }
 const slug = key => key.replace(/ /g, '-') || 'unnamed';
-
-const buyers = new Map();
-const nov1Years = new Set();
-const cover = { total: 0, beneficiary: 0, account: 0, tradewaterOwn: 0, unnamed: 0, unnamedNov1: 0 };
 const noteSnip = s => (s || '').replace(/\s+/g, ' ').trim().slice(0, 160);
 
+// ---- Which projects count: Tradewater's, and other developers' projects of the same types ----
+const twTypes = new Set(Object.values(typeById).filter(t => t !== 'Unknown'));
+// Developer label: the registry's proponent field, or the project name when that is blank, with a trailing
+// version or year removed so "A-Gas V6" and "A-Gas V14" group as "A-Gas".
+const TAIL = /[\s,-]*(v\d+|20\d\d(-\d+)?|\d{7})$/i;
+function developerName(p) {
+  let n = (p.proponent || '').trim() || p.name.trim();
+  for (let i = 0; i < 3 && TAIL.test(n); i++) n = n.replace(TAIL, '').trim();
+  return n || p.name;
+}
+const projInfo = new Map();   // project_id -> { tw, type, developer, url, registry }
+for (const p of projects) {
+  const t = projectType(p);
+  if (twIds.has(p.project_id)) projInfo.set(p.project_id, { tw: true, type: typeById[p.project_id], developer: 'Tradewater', url: p.project_url, registry: p.registry });
+  else if (twTypes.has(t)) projInfo.set(p.project_id, { tw: false, type: t, developer: developerName(p), url: p.project_url, registry: p.registry });
+}
+const registryOf = Object.fromEntries(projects.map(p => [p.project_id, p.registry]));
+
+// ---- One pass over every credit row ----
+const companies = new Map();   // nameKey -> company
+const developers = new Map();  // developer -> { projects, customers, intermediaries, total, last }
+const cover = { total: 0, beneficiary: 0, account: 0, tradewaterOwn: 0, unnamed: 0, unnamedNov1: 0 };
+const nov1Years = new Set();
+const regStats = {};           // registry -> { latestRetirement, latestIssuance, rows }
+for (const p of projects) regStats[p.registry] = regStats[p.registry] || { latestRetirement: '', latestIssuance: '', rows: 0 };
+const isInter = key => intermediaries.some(k => key.includes(k));
+const bump = (map, key, qty, date, name) => {
+  let o = map.get(key);
+  if (!o) { o = { name, qty: 0, count: 0, last: '' }; map.set(key, o); }
+  o.qty += qty; o.count += 1; if (date > o.last) o.last = date;
+};
+
 for (const c of credits) {
-  if (c.transaction_type !== 'retirement' || !twIds.has(c.project_id)) continue;
+  const date = (c.transaction_date || '').slice(0, 10);
+  const reg = regStats[registryOf[c.project_id]];
+  if (reg && date) {
+    if (c.transaction_type === 'retirement' && date > reg.latestRetirement) reg.latestRetirement = date;
+    if (c.transaction_type === 'issuance' && date > reg.latestIssuance) reg.latestIssuance = date;
+  }
+  if (c.transaction_type !== 'retirement') continue;
+  const info = projInfo.get(c.project_id);
+  if (!info) continue;
   const qty = num(c.quantity);
-  cover.total += qty;
+  reg.rows += 1;
 
   let ben = (c.retirement_beneficiary_harmonized || c.retirement_beneficiary || '').trim();
   if (/^[\d.\s-]*$/.test(ben)) ben = '';   // dates or ids like "20.03.02" are not buyer names
-  const acct = (c.retirement_account || '').trim();
-  let name = '', via = '';
-  if (ben) { name = ben; via = 'beneficiary'; cover.beneficiary += qty; }
-  else if (/^tradewater/i.test(acct)) { cover.tradewaterOwn += qty; name = 'Tradewater (retired from its own account)'; via = 'tradewater'; }
-  else if (acct && !/^\d+$/.test(acct)) { name = acct; via = 'account'; cover.account += qty; }
-  else {
-    cover.unnamed += qty; name = 'No buyer recorded'; via = 'none';
-    if ((c.transaction_date || '').slice(5, 10) === '11-01') { cover.unnamedNov1 += qty; nov1Years.add(c.transaction_date.slice(0, 4)); }   // 1 November looks like a compliance deadline
+  let acct = (c.retirement_account || '').trim();
+  if (/^\d+$/.test(acct)) acct = '';
+  const own = /^tradewater/i.test(acct);
+
+  // Who is the customer, and which intermediary (if any) retired the credits for them
+  let customer = '', via = '', mid = '';
+  if (ben) { customer = ben; via = 'beneficiary'; if (acct && !own && isInter(nameKey(acct)) && nameKey(acct) !== nameKey(ben)) mid = acct; }
+  else if (acct && !own) { customer = acct; via = 'account'; }
+
+  if (info.tw) {
+    cover.total += qty;
+    if (via === 'beneficiary') cover.beneficiary += qty;
+    else if (via === 'account') cover.account += qty;
+    else if (own) cover.tradewaterOwn += qty;
+    else { cover.unnamed += qty; if (date.slice(5, 10) === '11-01') { cover.unnamedNov1 += qty; nov1Years.add(date.slice(0, 4)); } }
   }
+  if (!customer) continue;
+  const key = nameKey(customer);
+  if (!key || /^tradewater/.test(key)) continue;
 
-  const key = via === 'tradewater' ? 'tradewater-own' : via === 'none' ? 'no-buyer-recorded' : nameKey(name);
-  if (!key) continue;
-  let b = buyers.get(key);
-  if (!b) {
-    b = { id: slug(key), key, names: {}, total: 0, count: 0, first: '', last: '', byYear: {}, byType: {}, viaVol: {}, tx: [] };
-    buyers.set(key, b);
+  let co = companies.get(key);
+  if (!co) { co = { id: slug(key), key, names: {}, via: { beneficiary: 0, account: 0 }, tx: [] }; companies.set(key, co); }
+  co.names[customer] = (co.names[customer] || 0) + qty;
+  co.via[via] += qty;
+  co.tx.push([date, Math.round(qty), c.project_id, c.vintage, info.developer, mid ? cleanName(mid) : '', noteSnip(c.retirement_note)]);
+
+  if (!info.tw) {
+    let d = developers.get(info.developer);
+    if (!d) { d = { name: info.developer, projects: new Set(), customers: new Map(), intermediaries: new Map(), total: 0, last: '' }; developers.set(info.developer, d); }
+    d.projects.add(c.project_id); d.total += qty; if (date > d.last) d.last = date;
+    if (isInter(key)) bump(d.intermediaries, key, qty, date, cleanName(customer));
+    else bump(d.customers, key, qty, date, cleanName(customer));
+    if (mid) bump(d.intermediaries, nameKey(mid), qty, date, cleanName(mid));
   }
-  const date = (c.transaction_date || '').slice(0, 10);
-  const year = date.slice(0, 4);
-  b.names[name] = (b.names[name] || 0) + qty;
-  b.total += qty; b.count += 1;
-  if (date && (!b.first || date < b.first)) b.first = date;
-  if (date && date > b.last) b.last = date;
-  b.byYear[year || 'unknown'] = (b.byYear[year || 'unknown'] || 0) + qty;
-  const type = typeById[c.project_id];
-  b.byType[type] = (b.byType[type] || 0) + qty;
-  b.viaVol[via] = (b.viaVol[via] || 0) + qty;
-  b.tx.push([date, qty, c.project_id, c.vintage, via, noteSnip(c.retirement_note)]);
 }
 
-const out = [];
-for (const b of buyers.values()) {
-  const name = cleanName(Object.entries(b.names).sort((a, z) => z[1] - a[1])[0][0]);
-  const special = b.key === 'tradewater-own' ? 'tradewater' : b.key === 'no-buyer-recorded' ? 'none' : '';
-  const kind = special
-    || (intermediaries.some(k => b.key.includes(k)) ? 'intermediary' : '')
-    || ((b.viaVol.account || 0) > (b.viaVol.beneficiary || 0) ? 'account' : 'buyer');
-  b.tx.sort((a, z) => z[0].localeCompare(a[0]));
-  out.push({
-    id: b.id, name, kind, total: Math.round(b.total), count: b.count, first: b.first, last: b.last,
-    yearsActive: Object.keys(b.byYear).filter(y => y !== 'unknown').length,
-    byYear: b.byYear, byType: b.byType, tx: b.tx,
-  });
-}
-out.sort((a, z) => z.total - a.total);
+const companyOut = [...companies.values()].map(co => {
+  co.tx.sort((a, z) => z[0].localeCompare(a[0]));
+  const name = cleanName(Object.entries(co.names).sort((a, z) => z[1] - a[1])[0][0]);
+  const kind = isInter(co.key) ? 'intermediary' : (co.via.account > co.via.beneficiary ? 'account' : 'buyer');
+  return { id: co.id, key: co.key, name, kind, tx: co.tx };
+}).sort((a, z) => z.tx.length - a.tx.length);
 
-// ---- Competitor buyers: who retires Tradewater-type credits from OTHER proponents ----
-const twTypes = new Set(Object.values(typeById).filter(t => t !== 'Unknown'));
-const otherProj = new Map();   // project_id -> { type, proponent, name }
-for (const p of projects) {
-  if (twIds.has(p.project_id)) continue;
-  const t = projectType(p);
-  if (twTypes.has(t)) otherProj.set(p.project_id, { type: t, proponent: (p.proponent || '').trim() || p.name, name: p.name });
-}
-const twKeys = new Set([...buyers.keys()]);
-const leads = new Map();
-const leadCover = { total: 0, named: 0 };
-for (const c of credits) {
-  if (c.transaction_type !== 'retirement') continue;
-  const pr = otherProj.get(c.project_id);
-  if (!pr) continue;
-  const qty = num(c.quantity);
-  leadCover.total += qty;
-  let name = (c.retirement_beneficiary_harmonized || c.retirement_beneficiary || '').trim();
-  let via = 'beneficiary';
-  if (/^[\d.\s-]*$/.test(name)) name = '';
-  if (!name) {
-    const acct = (c.retirement_account || '').trim();
-    if (acct && !/^\d+$/.test(acct) && !/^tradewater/i.test(acct)) { name = acct; via = 'account'; }
-  }
-  if (!name) continue;
-  leadCover.named += qty;
-  const key = nameKey(name);
-  if (!key || twKeys.has(key) || /tradewater/.test(key)) continue;   // already a Tradewater buyer
-  let l = leads.get(key);
-  if (!l) { l = { key, names: {}, total: 0, count: 0, first: '', last: '', byYear: {}, byType: {}, viaVol: {}, props: {}, tx: [] }; leads.set(key, l); }
-  const date = (c.transaction_date || '').slice(0, 10);
-  l.names[name] = (l.names[name] || 0) + qty;
-  l.total += qty; l.count += 1;
-  if (date && (!l.first || date < l.first)) l.first = date;
-  if (date && date > l.last) l.last = date;
-  const y = date.slice(0, 4) || 'unknown';
-  l.byYear[y] = (l.byYear[y] || 0) + qty;
-  l.byType[pr.type] = (l.byType[pr.type] || 0) + qty;
-  l.viaVol[via] = (l.viaVol[via] || 0) + qty;
-  l.props[pr.proponent] = (l.props[pr.proponent] || 0) + qty;
-  l.tx.push([date, qty, c.project_id, c.vintage, noteSnip(c.retirement_note), pr.proponent]);
-}
-const leadOut = [...leads.values()].map(l => {
-  l.tx.sort((a, z) => z[0].localeCompare(a[0]));
-  const kind = intermediaries.some(k => l.key.includes(k)) ? 'intermediary'
-    : ((l.viaVol.account || 0) > (l.viaVol.beneficiary || 0) ? 'account' : 'buyer');
-  return {
-    id: slug(l.key), name: cleanName(Object.entries(l.names).sort((a, z) => z[1] - a[1])[0][0]), kind,
-    total: Math.round(l.total), count: l.count, first: l.first, last: l.last,
-    yearsActive: Object.keys(l.byYear).filter(y => y !== 'unknown').length,
-    byYear: l.byYear, byType: l.byType,
-    proponents: Object.entries(l.props).sort((a, z) => z[1] - a[1]).slice(0, 5).map(([n, v]) => [n, Math.round(v)]),
-    tx: l.tx.slice(0, 30),
-  };
-}).sort((a, z) => z.total - a.total);
+const rowsOf = m => [...m.values()].sort((a, z) => z.qty - a.qty).map(o => [o.name, Math.round(o.qty), o.count, o.last]);
+const developerOut = [...developers.values()].map(d => ({
+  name: d.name, projects: d.projects.size, total: Math.round(d.total), last: d.last,
+  customers: rowsOf(d.customers), intermediaries: rowsOf(d.intermediaries),
+})).sort((a, z) => z.total - a.total);
 
+const REGISTRY_INFO = {
+  verra: ['Verra', 'https://registry.verra.org'],
+  'american-carbon-registry': ['American Carbon Registry', 'https://acr2.apx.com'],
+  'climate-action-reserve': ['Climate Action Reserve', 'https://thereserve2.apx.com'],
+  'gold-standard': ['Gold Standard', 'https://registry.goldstandard.org'],
+  'art-trees': ['ART TREES', 'https://art.apx.com'],
+  cercarbono: ['Cercarbono (via EcoRegistry)', 'https://www.ecoregistry.io'],
+  isometric: ['Isometric', 'https://registry.isometric.com'],
+};
+// Only registries that hold projects this tool covers
+const usedRegistries = new Set([...projInfo.values()].map(i => i.registry));
+const registries = [...usedRegistries].map(id => ({
+  id, name: (REGISTRY_INFO[id] || [id])[0], url: (REGISTRY_INFO[id] || [])[1] || '',
+  projects: [...projInfo.values()].filter(i => i.registry === id).length,
+  retirements: regStats[id].rows,
+  latestRetirement: regStats[id].latestRetirement, latestIssuance: regStats[id].latestIssuance,
+})).sort((a, z) => z.retirements - a.retirements);
+
+const usedIds = new Set(companyOut.flatMap(c => c.tx.map(t => t[2])));
 const data = {
   generatedAt: metadata.generated_at,
-  unnamedNov1Years: [...nov1Years].sort(),
-  leadTypes: [...twTypes],
-  leadCoverage: { total: Math.round(leadCover.total), named: Math.round(leadCover.named) },
-  leads: leadOut,
   source: 'CarbonPlan OffsetsDB',
+  types: [...twTypes],
+  unnamedNov1Years: [...nov1Years].sort(),
   coverage: Object.fromEntries(Object.entries(cover).map(([k, v]) => [k, Math.round(v)])),
+  registries,
   projects: twProjects.map(p => ({
-    id: p.project_id, name: p.name, registry: p.registry, type: projectType(p), country: p.country,
-    status: p.status, issued: Math.round(num(p.issued)), retired: Math.round(num(p.retired)), url: p.project_url,
+    id: p.project_id, name: p.name, registry: p.registry, type: projectType(p), url: p.project_url,
+    issued: Math.round(num(p.issued)), retired: Math.round(num(p.retired)),
   })).sort((a, z) => z.retired - a.retired),
-  buyers: out,
+  projectUrls: Object.fromEntries([...usedIds].map(id => [id, projInfo.get(id).url])),
+  companies: companyOut,
+  developers: developerOut,
 };
 
 const target = path.join(here, '..', 'site', 'data.js');
 fs.writeFileSync(target, 'window.TW_DATA = ' + JSON.stringify(data) + ';\n');
 console.log(`Wrote ${target}`);
-console.log(`${twProjects.length} Tradewater projects, ${out.length} buyer groups, ${cover.total} credits retired`);
+console.log(`${twProjects.length} Tradewater projects, ${companyOut.length} companies, ${developerOut.length} other developers, ${cover.total} credits retired`);
 console.log('Coverage (credits):', data.coverage);

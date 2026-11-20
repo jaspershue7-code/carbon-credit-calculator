@@ -58,7 +58,7 @@ export function validate(oldSummary) {
   const D = readAssigned(DATA_JS), P = readAssigned(PORTFOLIO_JS);
   const problems = [];
   if (!(D.projects && D.projects.length >= 50)) problems.push('fewer than 50 Tradewater projects in the buyer data');
-  if (!(D.buyers && D.buyers.length > 0) || !(D.leads && D.leads.length > 0)) problems.push('no buyers or no competitor buyers');
+  if (!(D.companies && D.companies.length > 0) || !(D.developers && D.developers.length > 0)) problems.push('no companies or no competitor developers');
   if (!(D.coverage && D.coverage.total > 0)) problems.push('no retired credits in the buyer data');
   if (!(P.totals && P.totals.projects >= 50 && P.totals.issued > 0)) problems.push('portfolio totals look empty');
   if (!P.version || !/^\d{4}-\d{2}-\d{2}$/.test(P.throughDate || '')) problems.push('portfolio version or date is missing');
